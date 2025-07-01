@@ -5,3 +5,8 @@ module.exports = function(api) {
     plugins: ['react-native-reanimated/plugin'],
   };
 }; 
+
+
+// This configuration file is for Babel, a JavaScript/TypeScript compiler
+// The expo preset handles React Native specific transformations
+// The reanimated plugin is required for smooth animations in the drawing canvas

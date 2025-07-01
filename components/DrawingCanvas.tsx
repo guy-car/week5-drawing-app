@@ -43,6 +43,22 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
 
+    // Canvas coordinates are already correct - no conversion needed!
+    const screenToCanvas = (screenX: number, screenY: number) => {
+      // Debug logging to confirm coordinates are already correct
+      console.log('🔍 Using direct coordinates:');
+      console.log(`Input: screenX=${screenX.toFixed(2)}, screenY=${screenY.toFixed(2)}`);
+      console.log(`Transform state: translateX=${translateX.value.toFixed(2)}, translateY=${translateY.value.toFixed(2)}, scale=${scale.value.toFixed(2)}`);
+      console.log('Using coordinates directly (no transformation needed)');
+      console.log('---');
+      
+      // Return coordinates as-is since Canvas touch events are already in canvas space
+      return {
+        x: screenX,
+        y: screenY
+      };
+    };
+
     // Use derived values for dimensions to ensure they're always valid
     const canvasWidth = useDerivedValue(() => BASE_CANVAS_SIZE);
     const canvasHeight = useDerivedValue(() => BASE_CANVAS_SIZE);
@@ -88,14 +104,17 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       const { locationX, locationY } = touch;
       
       if (locationX !== undefined && locationY !== undefined) {
+        // Convert screen coordinates to canvas coordinates
+        const canvasCoords = screenToCanvas(locationX, locationY);
+        
         const path = Skia.Path.Make();
-        path.moveTo(locationX, locationY);
+        path.moveTo(canvasCoords.x, canvasCoords.y);
         
         setCurrentPath({
           path,
-          startX: locationX,
-          startY: locationY,
-          points: [[locationX, locationY]]
+          startX: canvasCoords.x,
+          startY: canvasCoords.y,
+          points: [[canvasCoords.x, canvasCoords.y]]
         });
       }
     };
@@ -107,6 +126,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       const { locationX, locationY } = touch;
       
       if (locationX !== undefined && locationY !== undefined) {
+        // Convert screen coordinates to canvas coordinates
+        const canvasCoords = screenToCanvas(locationX, locationY);
+        
         const newPath = Skia.Path.Make();
         newPath.moveTo(currentPath.startX, currentPath.startY);
         
@@ -114,13 +136,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           newPath.lineTo(x, y);
         });
         
-        newPath.lineTo(locationX, locationY);
+        newPath.lineTo(canvasCoords.x, canvasCoords.y);
         
         setCurrentPath({
           path: newPath,
           startX: currentPath.startX,
           startY: currentPath.startY,
-          points: [...currentPath.points, [locationX, locationY]]
+          points: [...currentPath.points, [canvasCoords.x, canvasCoords.y]]
         });
       }
     };
