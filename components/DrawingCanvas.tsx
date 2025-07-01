@@ -226,17 +226,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             height: screenHeight * 0.8,
           }]}
         >
-          {mode === 'pan' ? (
-            <GestureDetector gesture={panGesture}>
-              <Animated.View style={[styles.gestureContainer, animatedStyle]}>
-                {canvasContent}
-              </Animated.View>
-            </GestureDetector>
-          ) : (
-            canvasContent
-          )}
+          <GestureDetector gesture={mode === 'pan' ? panGesture : Gesture.Tap()}>
+            <Animated.View style={[styles.gestureContainer, animatedStyle]}>
+              {canvasContent}
+            </Animated.View>
+          </GestureDetector>
         </View>
-        <Text style={styles.hint}>Tap and drag to draw</Text>
+        <Text style={styles.hint}>
+          {mode === 'draw' ? 'Tap and drag to draw' : 'Use two fingers to pan'}
+        </Text>
       </View>
     );
   }
