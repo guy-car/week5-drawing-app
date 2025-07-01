@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
+import { debugAIVision, debugDrawingIntention, testCoordinates, proceedWithAPICall } from './src/api/openai';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -39,291 +40,110 @@ export default function App() {
     setMode(mode === 'draw' ? 'pan' : 'draw');
   };
 
-  const testAIIntegration = async () => {
+  const proceedWithAPICallHandler = async () => {
     if (!canvasRef.current) {
       Alert.alert('Error', 'Canvas not available');
       return;
     }
 
-    // Check if API key is available
-    if (!OPENAI_API_KEY) {
-      Alert.alert(
-        'API Key Missing', 
-        'OpenAI API key not found. Please add your API key to the .env file:\nEXPO_PUBLIC_OPENAI_API_KEY=your-key-here',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    // 🚨 SECURITY WARNING for development
-    Alert.alert(
-      '🚨 Development Mode Warning',
-      'This is for DEVELOPMENT ONLY!\n\n⚠️ Your OpenAI API key will be visible in:\n• Network requests\n• App bundle\n• Developer tools\n\nNever distribute this build!',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Continue (Dev Only)', 
-          style: 'destructive',
-          onPress: () => proceedWithAPICall()
-        }
-      ]
-    );
-  };
-
-  const proceedWithAPICall = async () => {
     setIsTestingAI(true);
     console.log('🧪 Starting AI integration test...');
-    console.log('🔑 Using API key:', OPENAI_API_KEY?.substring(0, 10) + '...');
 
     try {
-      // Step 1: Export canvas as base64 image
-      console.log('📸 Exporting canvas...');
-      const base64Image = await canvasRef.current?.exportCanvas();
-      
-      if (!base64Image) {
-        throw new Error('Failed to export canvas image');
-      }
+      const base64Image = await canvasRef.current.exportCanvas();
+      if (!base64Image) throw new Error('Failed to export canvas');
 
-      console.log('✅ Canvas exported successfully');
+      const commands = await proceedWithAPICall(base64Image);
+      console.log('✅ Successfully parsed AI commands:', commands);
 
-      // Step 2: Send to OpenAI Vision API
-      console.log('🤖 Sending to OpenAI Vision API...');
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `You are looking at a drawing on a 1000x1000 pixel canvas. The coordinate system has:
-- Top-left corner: (0, 0)
-- Top-right corner: (1000, 0)  
-- Bottom-left corner: (0, 1000)
-- Bottom-right corner: (1000, 1000)
+      // Use our addAIPath method to render the commands
+      canvasRef.current.addAIPath(commands);
 
-Please:
-1. Analyze what's currently drawn
-2. Add ONE simple complementary line or shape
-3. Ensure ALL coordinates are within 0-1000 range
-4. Respond with ONLY a JSON array of drawing commands
-
-Format: [{"type": "moveTo", "x": number, "y": number}, {"type": "lineTo", "x": number, "y": number}, ...]
-
-Important: 
-- x and y must be integers between 0 and 1000
-- Start with moveTo, then use lineTo commands
-- Keep it simple (3-8 commands max)`
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: base64Image
-                  }
-                }
-              ]
-            }
-          ],
-          max_tokens: 1000
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('❌ OpenAI API Error:', response.status, errorData);
-        
-        if (response.status === 401) {
-          throw new Error('Invalid API key. Please check your EXPO_PUBLIC_OPENAI_API_KEY in .env file.');
-        } else if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`OpenAI API error (${response.status}): ${errorData}`);
-        }
-      }
-
-      const data = await response.json();
-      console.log('🎉 OpenAI API Response:', JSON.stringify(data, null, 2));
-
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        let aiResponse = data.choices[0].message.content;
-        console.log('🤖 AI Generated Commands:', aiResponse);
-        
-        try {
-          // Remove backticks and parse the JSON
-          aiResponse = aiResponse.replace(/```json|```/g, '').trim();
-          const commands = JSON.parse(aiResponse);
-          
-          if (Array.isArray(commands)) {
-            console.log('✅ Successfully parsed AI commands:', commands);
-            
-            // Use our addAIPath method to render the commands
-            canvasRef.current?.addAIPath(commands);
-            
-            Alert.alert(
-              'AI Test Success!', 
-              `✅ Canvas exported and AI commands rendered!\n\nAI added ${commands.length} drawing commands.\n\nCheck console for full response.`,
-              [{ text: 'OK' }]
-            );
-          } else {
-            throw new Error('AI response is not an array of commands');
-          }
-        } catch (parseError) {
-          console.error('⚠️ Failed to parse AI response:', parseError);
-          console.log('Raw AI response:', aiResponse);
-          Alert.alert(
-            'AI Response Error', 
-            'The AI response was not in the expected format. Check console for details.',
-            [{ text: 'OK' }]
-          );
-        }
-      } else {
-        throw new Error('Unexpected API response format');
-      }
-
+      Alert.alert('AI Test Success!', `✅ Canvas exported and AI commands rendered!\n\nAI added ${commands.length} drawing commands.\n\nCheck console for full response.`, [{ text: 'OK' }]);
     } catch (error) {
       console.error('❌ AI Integration Test Failed:', error);
-      Alert.alert(
-        'AI Test Failed', 
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('AI Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
     } finally {
       setIsTestingAI(false);
     }
   };
 
-  const debugAIVision = async () => {
-    if (!canvasRef.current || !OPENAI_API_KEY) {
-      Alert.alert('Error', 'Canvas or API key not available');
+  const debugAIVisionHandler = async () => {
+    if (!canvasRef.current) {
+      Alert.alert('Error', 'Canvas not available');
       return;
     }
-    
     setIsTestingAI(true);
     console.log('🔍 Debugging AI Vision...');
 
     try {
-      const base64Image = await canvasRef.current?.exportCanvas();
+      const base64Image = await canvasRef.current.exportCanvas();
       if (!base64Image) throw new Error('Failed to export canvas');
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'Describe in detail what you see in this drawing. Include:\n1. What objects/shapes are drawn\n2. Their approximate positions (describe as percentages from top-left)\n3. The overall composition\n4. Any patterns or relationships between elements\n\nBe very specific about locations and shapes.'
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: base64Image }
-                }
-              ]
-            }
-          ],
-          max_tokens: 500
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const description = data.choices[0].message.content;
-      
+      const description = await debugAIVision(base64Image);
       console.log('🤖 AI Vision Analysis:', description);
-      Alert.alert(
-        'AI Vision Debug', 
-        description,
-        [{ text: 'OK' }]
-      );
+      Alert.alert('AI Vision Debug', description, [{ text: 'OK' }]);
     } catch (error) {
       console.error('❌ AI Vision Debug Failed:', error);
-      Alert.alert(
-        'Debug Failed', 
-        error instanceof Error ? error.message : 'Unknown error',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Debug Failed', error instanceof Error ? error.message : 'Unknown error', [{ text: 'OK' }]);
     } finally {
       setIsTestingAI(false);
     }
   };
 
-  const debugDrawingIntention = async () => {
-    if (!canvasRef.current || !OPENAI_API_KEY) {
-      Alert.alert('Error', 'Canvas or API key not available');
+  const debugDrawingIntentionHandler = async () => {
+    if (!canvasRef.current) {
+      Alert.alert('Error', 'Canvas not available');
       return;
     }
-    
     setIsTestingAI(true);
     console.log('🎯 Debugging AI Drawing Intention...');
 
     try {
-      const base64Image = await canvasRef.current?.exportCanvas();
+      const base64Image = await canvasRef.current.exportCanvas();
       if (!base64Image) throw new Error('Failed to export canvas');
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'Looking at this drawing, I want you to explain your creative process:\n\n1. What do you see in the image?\n2. What would you like to add to complement or enhance this drawing?\n3. Why did you choose that specific addition?\n4. Where approximately would you place it? (describe in general terms like "top-left", "center", "bottom-right")\n5. What shape or line would achieve your creative goal?\n\nPlease be specific about your reasoning and placement strategy. Do NOT generate coordinates yet - just explain your artistic intention.'
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: base64Image }
-                }
-              ]
-            }
-          ],
-          max_tokens: 600
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const intention = data.choices[0].message.content;
-      
+      const intention = await debugDrawingIntention(base64Image);
       console.log('🎯 AI Drawing Intention:', intention);
-      Alert.alert(
-        'AI Drawing Intention', 
-        intention,
-        [{ text: 'OK' }]
-      );
+      Alert.alert('AI Drawing Intention', intention, [{ text: 'OK' }]);
     } catch (error) {
       console.error('❌ AI Drawing Intention Debug Failed:', error);
-      Alert.alert(
-        'Intention Debug Failed', 
-        error instanceof Error ? error.message : 'Unknown error',
-        [{ text: 'OK' }]
+      Alert.alert('Intention Debug Failed', error instanceof Error ? error.message : 'Unknown error', [{ text: 'OK' }]);
+    } finally {
+      setIsTestingAI(false);
+    }
+  };
+
+  const testCoordinatesHandler = async () => {
+    if (!canvasRef.current) {
+      Alert.alert('Error', 'Canvas not available');
+      return;
+    }
+    setIsTestingAI(true);
+    console.log('📏 Testing Coordinate Understanding...');
+
+    try {
+      const commands = await testCoordinates();
+      console.log('✅ Successfully parsed AI commands:', commands);
+
+      // Validate all commands have valid coordinates
+      const hasInvalidCommands = commands.some(
+        cmd => isNaN(cmd.x) || isNaN(cmd.y) || 
+              cmd.x < 0 || cmd.x > 1000 || 
+              cmd.y < 0 || cmd.y > 1000
       );
+
+      if (hasInvalidCommands) {
+        throw new Error('Some commands have invalid coordinates');
+      }
+
+      // Use our addAIPath method to render the commands
+      canvasRef.current.addAIPath(commands);
+
+      Alert.alert('Coordinate Test Complete', `✅ AI generated ${commands.length} commands to draw a circle.\n\nCheck the canvas to verify the circle position and shape.`, [{ text: 'OK' }]);
+    } catch (error) {
+      console.error('❌ Coordinate Test Failed:', error);
+      Alert.alert('Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
     } finally {
       setIsTestingAI(false);
     }
@@ -380,7 +200,7 @@ Important:
         <View style={styles.buttonRow}>
           <TouchableOpacity 
             style={[styles.debugButton]} 
-            onPress={debugAIVision}
+            onPress={debugAIVisionHandler}
             disabled={isTestingAI}
           >
             <Text style={styles.debugButtonText}>
@@ -390,11 +210,21 @@ Important:
           
           <TouchableOpacity 
             style={[styles.intentionButton]} 
-            onPress={debugDrawingIntention}
+            onPress={debugDrawingIntentionHandler}
             disabled={isTestingAI}
           >
             <Text style={styles.intentionButtonText}>
               🎯 Intent
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.coordButton]} 
+            onPress={testCoordinatesHandler}
+            disabled={isTestingAI}
+          >
+            <Text style={styles.coordButtonText}>
+              📏 Test
             </Text>
           </TouchableOpacity>
           
@@ -409,7 +239,7 @@ Important:
 
           <TouchableOpacity 
             style={[styles.aiTestButton, isTestingAI && styles.aiTestButtonDisabled]} 
-            onPress={testAIIntegration}
+            onPress={proceedWithAPICallHandler}
             disabled={isTestingAI}
           >
             <Text style={styles.aiTestButtonText}>
@@ -550,6 +380,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   intentionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  coordButton: {
+    backgroundColor: '#e83e8c',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.8,
+    alignItems: 'center',
+  },
+  coordButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',

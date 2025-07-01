@@ -19,7 +19,8 @@
     "react-native": "0.79.4",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-reanimated": "~3.17.4",
-    "react-native-web": "^0.20.0"
+    "react-native-web": "^0.20.0",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
