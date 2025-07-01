@@ -43,14 +43,18 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
 
+    // Add shared values to store the starting position when pan gesture begins
+    const startTranslateX = useSharedValue(0);
+    const startTranslateY = useSharedValue(0);
+
     // Canvas coordinates are already correct - no conversion needed!
     const screenToCanvas = (screenX: number, screenY: number) => {
-      // Debug logging to confirm coordinates are already correct
-      console.log('🔍 Using direct coordinates:');
-      console.log(`Input: screenX=${screenX.toFixed(2)}, screenY=${screenY.toFixed(2)}`);
-      console.log(`Transform state: translateX=${translateX.value.toFixed(2)}, translateY=${translateY.value.toFixed(2)}, scale=${scale.value.toFixed(2)}`);
-      console.log('Using coordinates directly (no transformation needed)');
-      console.log('---');
+      // // Debug logging to confirm coordinates are already correct
+      // console.log('🔍 Using direct coordinates:');
+      // console.log(`Input: screenX=${screenX.toFixed(2)}, screenY=${screenY.toFixed(2)}`);
+      // console.log(`Transform state: translateX=${translateX.value.toFixed(2)}, translateY=${translateY.value.toFixed(2)}, scale=${scale.value.toFixed(2)}`);
+      // console.log('Using coordinates directly (no transformation needed)');
+      // console.log('---');
       
       // Return coordinates as-is since Canvas touch events are already in canvas space
       return {
@@ -71,13 +75,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       scale.value = withSpring(newScale);
       onZoomChange(newScale);
     };
-
-    useEffect(() => {
-      if (mode === 'draw') {
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-      }
-    }, [mode]);
 
     useImperativeHandle(ref, () => ({
       clear: () => {
@@ -156,9 +153,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const panGesture = Gesture.Pan()
       .enabled(mode === 'pan')
       .minPointers(2)
+      .onStart(() => {
+        // Store the current canvas position when gesture starts
+        startTranslateX.value = translateX.value;
+        startTranslateY.value = translateY.value;
+      })
       .onUpdate((e) => {
-        translateX.value = e.translationX;
-        translateY.value = e.translationY;
+        // Add gesture translation to the stored starting position
+        translateX.value = startTranslateX.value + e.translationX;
+        translateY.value = startTranslateY.value + e.translationY;
       })
       .runOnJS(true);
 
