@@ -15,6 +15,14 @@ interface DrawingCanvasRef {
   clear: () => void;
 }
 
+// Types for path data
+interface PathWithData {
+  path: any; // Skia.Path type
+  startX: number;
+  startY: number;
+  points: [number, number][];
+}
+
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
   ({ mode, onZoomChange, screenWidth, screenHeight }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -22,7 +30,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     
     // Mobile drawing state
     const [paths, setPaths] = useState<any[]>([]);
-    const [currentPath, setCurrentPath] = useState<any>(null);
+    const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     
     // Calculate initial scale to fit canvas in screen
     const initialScale = Math.min(screenWidth / CANVAS_SIZE, screenHeight / CANVAS_SIZE) * 0.9;
@@ -86,10 +94,21 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       if (mode !== 'draw') return;
       
       const { locationX, locationY } = event.nativeEvent;
+      
       if (locationX !== undefined && locationY !== undefined) {
-        const newPath = Skia.Path.Make();
-        newPath.moveTo(locationX, locationY);
-        setCurrentPath(newPath);
+        // Create path and store initial point
+        const path = Skia.Path.Make();
+        path.moveTo(locationX, locationY);
+        
+        // Store the initial point with the path
+        const pathWithStart: PathWithData = {
+          path,
+          startX: locationX,
+          startY: locationY,
+          points: [[locationX, locationY]]
+        };
+        
+        setCurrentPath(pathWithStart);
       }
     };
 
@@ -97,16 +116,35 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       if (mode !== 'draw' || !currentPath) return;
       
       const { locationX, locationY } = event.nativeEvent;
+      
       if (locationX !== undefined && locationY !== undefined) {
-        const newPath = Skia.Path.MakeFromSVGString(currentPath.toSVGString())!;
+        // Create a new path starting from the original point
+        const newPath = Skia.Path.Make();
+        newPath.moveTo(currentPath.startX, currentPath.startY);
+        
+        // Add all existing points
+        currentPath.points.forEach(([x, y]: [number, number]) => {
+          newPath.lineTo(x, y);
+        });
+        
+        // Add the new point
         newPath.lineTo(locationX, locationY);
-        setCurrentPath(newPath);
+        
+        // Update the path and points array
+        const updatedPath: PathWithData = {
+          path: newPath,
+          startX: currentPath.startX,
+          startY: currentPath.startY,
+          points: [...currentPath.points, [locationX, locationY]]
+        };
+        
+        setCurrentPath(updatedPath);
       }
     };
 
     const onTouchEnd = () => {
-      if (currentPath && mode === 'draw') {
-        setPaths(prevPaths => [...prevPaths, currentPath]);
+      if (currentPath?.path && mode === 'draw') {
+        setPaths(prevPaths => [...prevPaths, currentPath.path]);
         setCurrentPath(null);
       }
     };
@@ -162,15 +200,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             borderWidth: 1,
             borderColor: '#ccc',
           }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
         >
           <Canvas
             style={{
               width: '100%',
               height: '100%',
             }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
           >
             {/* Render all completed paths */}
             {paths.map((path, index) => (
@@ -187,7 +225,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             {/* Render current path being drawn */}
             {currentPath && (
               <Path
-                path={currentPath}
+                path={currentPath.path}
                 color="black"
                 style="stroke"
                 strokeWidth={2}

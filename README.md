@@ -54,3 +54,27 @@ A React Native Expo app with drawing canvas functionality using React Native Ski
 - Smooth gesture handling with react-native-gesture-handler
 - Canvas rendering with React Native Skia
 - TypeScript support 
+
+## Implementation Notes
+
+### Drawing Coordinate System Fix
+When implementing the drawing functionality with React Native Skia, we encountered and solved an interesting issue with path coordinates. Initially, all drawn lines would start from the top-left corner (0,0) regardless of the actual touch position. This was caused by relying on SVG string manipulation for path creation.
+
+The solution involved:
+1. Creating a custom path data structure to maintain the actual touch coordinates:
+```typescript
+interface PathWithData {
+  path: SkiaPath;
+  startX: number;
+  startY: number;
+  points: [number, number][];
+}
+```
+
+2. Instead of using SVG strings, we now:
+   - Store the initial touch point when drawing starts
+   - Maintain an array of all points in the path
+   - Recreate the path from the original coordinates for each update
+   - This ensures the path always starts from the actual touch point
+
+This approach provides more precise control over the drawing coordinates and prevents the (0,0) coordinate issue that can occur when manipulating SVG path strings directly. 
