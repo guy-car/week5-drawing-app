@@ -1,6 +1,6 @@
-import { forwardRef, useImperativeHandle, useState, useEffect } from 'react';
+import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Canvas, Path, Skia, Group, Rect } from '@shopify/react-native-skia';
+import { Canvas, Path, Skia, Group, Rect, useCanvasRef } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { 
   useSharedValue,
@@ -24,6 +24,8 @@ interface DrawingCanvasProps {
 interface DrawingCanvasRef {
   clear: () => void;
   handleZoom: (increment: boolean) => void;
+  exportCanvas: () => Promise<string | null>;
+  addAIPath: (commands: { type: string; x: number; y: number }[]) => void;
 }
 
 interface PathWithData {
@@ -37,6 +39,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
   ({ mode, onZoomChange, screenWidth, screenHeight }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
+    const canvasRef = useCanvasRef();
     
     const initialScale = Math.min(screenWidth / BASE_CANVAS_SIZE, screenHeight / BASE_CANVAS_SIZE) * 0.9;
     const translateX = useSharedValue(0);
@@ -49,12 +52,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     // Canvas coordinates are already correct - no conversion needed!
     const screenToCanvas = (screenX: number, screenY: number) => {
-      // // Debug logging to confirm coordinates are already correct
-      // console.log('🔍 Using direct coordinates:');
-      // console.log(`Input: screenX=${screenX.toFixed(2)}, screenY=${screenY.toFixed(2)}`);
-      // console.log(`Transform state: translateX=${translateX.value.toFixed(2)}, translateY=${translateY.value.toFixed(2)}, scale=${scale.value.toFixed(2)}`);
-      // console.log('Using coordinates directly (no transformation needed)');
-      // console.log('---');
+      // Debug logging to confirm coordinates are already correct
+      console.log('🔍 Using direct coordinates:');
+      console.log(`Input: screenX=${screenX.toFixed(2)}, screenY=${screenY.toFixed(2)}`);
+      console.log(`Transform state: translateX=${translateX.value.toFixed(2)}, translateY=${translateY.value.toFixed(2)}, scale=${scale.value.toFixed(2)}`);
+      console.log('Using coordinates directly (no transformation needed)');
+      console.log('---');
       
       // Return coordinates as-is since Canvas touch events are already in canvas space
       return {
@@ -76,12 +79,71 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       onZoomChange(newScale);
     };
 
+    const exportCanvas = async (): Promise<string | null> => {
+      try {
+        if (!canvasRef.current) {
+          console.error('Canvas ref is not available');
+          return null;
+        }
+
+        // Create an image snapshot of the current canvas
+        const image = canvasRef.current.makeImageSnapshot();
+        if (!image) {
+          console.error('Failed to create image snapshot');
+          return null;
+        }
+
+        // Encode the image as PNG and get base64 data
+        const bytes = image.encodeToBytes();
+        if (!bytes) {
+          console.error('Failed to encode image to bytes');
+          return null;
+        }
+
+        // Convert bytes to base64 string
+        const base64 = bytes.reduce((data, byte) => data + String.fromCharCode(byte), '');
+        const base64String = btoa(base64);
+        
+        console.log('✅ Canvas exported successfully, base64 length:', base64String.length);
+        return `data:image/png;base64,${base64String}`;
+      } catch (error) {
+        console.error('❌ Error exporting canvas:', error);
+        return null;
+      }
+    };
+
+    const addAIPath = (commands: { type: string; x: number; y: number }[]) => {
+      try {
+        const aiPath = Skia.Path.Make();
+        
+        commands.forEach((command) => {
+          switch (command.type.toLowerCase()) {
+            case 'moveto':
+              aiPath.moveTo(command.x, command.y);
+              break;
+            case 'lineto':
+              aiPath.lineTo(command.x, command.y);
+              break;
+            default:
+              console.warn(`Unknown command type: ${command.type}`);
+          }
+        });
+        
+        setPaths(prevPaths => [...prevPaths, aiPath]);
+        console.log('✅ AI path added successfully');
+      } catch (error) {
+        console.error('❌ Error adding AI path:', error);
+      }
+    };
+
     useImperativeHandle(ref, () => ({
       clear: () => {
         setPaths([]);
         setCurrentPath(null);
       },
       handleZoom,
+      exportCanvas,
+      addAIPath,
     }));
 
     const animatedStyle = useAnimatedStyle(() => {
@@ -167,6 +229,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const canvasContent = (
       <Canvas
+        ref={canvasRef}
         style={[styles.canvas, {
           width: BASE_CANVAS_SIZE,
           height: BASE_CANVAS_SIZE
