@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { 
@@ -9,6 +9,9 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const CANVAS_SIZE = 1000;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.25;
 
 interface DrawingCanvasProps {
   mode: 'draw' | 'pan';
@@ -19,6 +22,7 @@ interface DrawingCanvasProps {
 
 interface DrawingCanvasRef {
   clear: () => void;
+  handleZoom: (increment: boolean) => void;
 }
 
 interface PathWithData {
@@ -36,6 +40,16 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const initialScale = Math.min(screenWidth / CANVAS_SIZE, screenHeight / CANVAS_SIZE) * 0.9;
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
+    const scale = useSharedValue(1);
+
+    const handleZoom = (increment: boolean) => {
+      const newScale = increment 
+        ? Math.min(scale.value + ZOOM_STEP, MAX_ZOOM)
+        : Math.max(scale.value - ZOOM_STEP, MIN_ZOOM);
+      
+      scale.value = withSpring(newScale);
+      onZoomChange(newScale);
+    };
 
     useEffect(() => {
       console.log('Mode changed:', mode);
@@ -50,13 +64,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         setPaths([]);
         setCurrentPath(null);
       },
+      handleZoom,
     }));
 
     const animatedStyle = useAnimatedStyle(() => {
       return {
         transform: [
           { translateX: translateX.value },
-          { translateY: translateY.value }
+          { translateY: translateY.value },
+          { scale: scale.value }
         ]
       };
     });
@@ -220,9 +236,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             canvasContent
           )}
         </View>
-        <Text style={styles.modeText}>
-          {mode === 'draw' ? 'Tap and drag to draw' : 'Use two fingers to pan'}
-        </Text>
+        <Text style={styles.hint}>Tap and drag to draw</Text>
       </View>
     );
   }
@@ -231,30 +245,31 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
+    justifyContent: 'center',
   },
   canvasContainer: {
     backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ccc',
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   canvas: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
+    backgroundColor: 'white',
   },
   gestureContainer: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
   },
-  modeText: {
-    position: 'absolute',
-    bottom: 20,
-    fontSize: 14,
+  hint: {
+    marginTop: 10,
     color: '#666',
-    textAlign: 'center',
-  }
+    fontSize: 16,
+  },
 });
 
 export default DrawingCanvas; 
