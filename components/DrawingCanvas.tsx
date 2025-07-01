@@ -26,6 +26,7 @@ interface DrawingCanvasRef {
   handleZoom: (increment: boolean) => void;
   exportCanvas: () => Promise<string | null>;
   addAIPath: (commands: { type: string; x: number; y: number }[]) => void;
+  addDebugGrid: () => void;
 }
 
 interface PathWithData {
@@ -114,9 +115,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const addAIPath = (commands: { type: string; x: number; y: number }[]) => {
       try {
+        console.log('🎯 AI Commands received:', commands);
+        
+        // Validate and log coordinates
+        const validatedCommands = commands.map((command, index) => {
+          const x = Math.max(0, Math.min(1000, command.x));
+          const y = Math.max(0, Math.min(1000, command.y));
+          
+          if (x !== command.x || y !== command.y) {
+            console.warn(`⚠️ Command ${index}: Clamped (${command.x}, ${command.y}) to (${x}, ${y})`);
+          }
+          
+          console.log(`📍 Command ${index}: ${command.type} to (${x}, ${y})`);
+          return { ...command, x, y };
+        });
+        
         const aiPath = Skia.Path.Make();
         
-        commands.forEach((command) => {
+        validatedCommands.forEach((command) => {
           switch (command.type.toLowerCase()) {
             case 'moveto':
               aiPath.moveTo(command.x, command.y);
@@ -136,6 +152,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       }
     };
 
+    const addDebugGrid = () => {
+      console.log('🔧 Adding debug grid to visualize coordinate system');
+      const gridPath = Skia.Path.Make();
+      
+      // Add grid lines every 100 pixels with labels
+      for (let i = 0; i <= 1000; i += 100) {
+        // Vertical lines
+        gridPath.moveTo(i, 0);
+        gridPath.lineTo(i, 1000);
+        // Horizontal lines  
+        gridPath.moveTo(0, i);
+        gridPath.lineTo(1000, i);
+      }
+      
+      setPaths(prevPaths => [...prevPaths, gridPath]);
+      console.log('✅ Debug grid added - shows 100px intervals on 1000x1000 canvas');
+    };
+
     useImperativeHandle(ref, () => ({
       clear: () => {
         setPaths([]);
@@ -144,6 +178,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       handleZoom,
       exportCanvas,
       addAIPath,
+      addDebugGrid,
     }));
 
     const animatedStyle = useAnimatedStyle(() => {
