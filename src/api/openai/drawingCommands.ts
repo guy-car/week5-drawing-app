@@ -217,4 +217,86 @@ For lines: {"type": "moveTo", "x": 100, "y": 100}, {"type": "lineTo", "x": 200, 
     console.error('Unexpected error:', error);
     throw new Error('An unexpected error occurred while processing creative drawing commands');
   }
+}
+
+export async function testPurposefulAdditions(): Promise<DrawingCommands> {
+  try {
+    const response = await fetch(openaiConfig.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Please analyze what's currently drawn and add one or two complementary elements that naturally enhance the drawing. You can create simple shapes, lines, or details that feel appropriate to the existing artwork.
+
+Command guidance: "3-15 commands total, focusing on purposeful additions"`
+              }
+            ]
+          }
+        ],
+        max_tokens: 2000,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'DrawingCommandsSchema',
+            schema: zodToJsonSchema(z.object({
+              commands: z.array(commandSchema)
+            }).strict())
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API error:', response.status, errorText);
+      throw new DrawingAPIError(`API request failed with status ${response.status}`, response.status, errorText);
+    }
+
+    const data: OpenAIResponse = await response.json();
+    console.log('Purposeful Additions Response:', data);
+
+    try {
+      OpenAIResponseSchema.parse(data);
+    } catch (error) {
+      console.error('OpenAI response validation failed:', error);
+      throw new DrawingValidationError('Invalid OpenAI response format', error);
+    }
+
+    let aiResponse = data.choices[0].message.content;
+    aiResponse = aiResponse.replace(/```json|```/g, '').trim();
+    console.log('Purposeful AI Response:', aiResponse);
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiResponse);
+    } catch (error) {
+      console.error('JSON parsing failed:', error);
+      throw new DrawingValidationError('Failed to parse AI response as JSON', error);
+    }
+
+    if (!parsedResponse.commands || !Array.isArray(parsedResponse.commands)) {
+      console.error('Invalid commands array:', parsedResponse);
+      throw new DrawingValidationError('AI response does not contain a valid commands array');
+    }
+
+    const validatedCommands = validateDrawingCommands(parsedResponse.commands);
+    console.log('Validated purposeful commands:', validatedCommands);
+
+    return validatedCommands;
+  } catch (error) {
+    if (error instanceof DrawingAPIError || error instanceof DrawingValidationError) {
+      throw error;
+    }
+    console.error('Unexpected error:', error);
+    throw new Error('An unexpected error occurred while processing purposeful drawing commands');
+  }
 } 
