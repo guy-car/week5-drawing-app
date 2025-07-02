@@ -79,6 +79,31 @@ const stamp = (label: string) =>
 - Added troubleshooting guide
 - Updated setup instructions with API key requirements
 
+## Post-Implementation Fixes
+
+### 1. OpenAI API Schema Compliance
+- Fixed `response_format` in `riffOnSketch.ts` to properly wrap schema under `json_schema` key
+- Added required `name` field to schema definition
+
+### 2. Stream Parsing Robustness
+- Enhanced SSE frame handling in `StreamJsonParser.ts`:
+  - Added helper to strip `data:` prefixes
+  - Properly filter `[DONE]` messages
+  - Improved incremental analysis object capture
+  - Added depth tracking for nested JSON structures
+
+### 3. Memory Management
+- Fixed Skia resource leaks in `DrawingCanvas.tsx`:
+  - Added `surface.dispose()` after snapshot
+  - Added `finalImage.dispose()` after encoding
+  - Added null checks before disposal
+
+### 4. App Integration
+- Removed legacy imports from `App.tsx`
+- Updated `exportCanvasWithCommands` type to include vector summary
+- Switched AI Draw handler to use new streaming flow
+- Added proper error handling and state management
+
 ## Next Steps
 1. Run performance analysis with React Native tools
 2. Fine-tune JPEG quality vs size tradeoff
