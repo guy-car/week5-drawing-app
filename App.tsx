@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
-import { debugAIVision, debugDrawingIntention, testCoordinates, proceedWithAPICall } from './src/api/openai';
+import { debugAIVision, debugDrawingIntention, testCoordinates, testCreativeDrawing, proceedWithAPICall } from './src/api/openai';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -179,6 +179,26 @@ export default function App() {
     }
   };
 
+  const testCreativeDrawingHandler = async () => {
+    setIsTestingAI(true);
+    console.log('🎨 Testing AI Creative Drawing...');
+
+    try {
+      const commands = await testCreativeDrawing();
+      console.log('🎨 Creative Commands received:', commands);
+      
+      if (canvasRef.current && commands.length > 0) {
+        canvasRef.current.addAIPath(commands);
+        Alert.alert('Success!', `AI drew ${commands.length} creative commands for a sun!`);
+      }
+    } catch (error) {
+      console.error('❌ Creative Drawing Failed:', error);
+      Alert.alert('Creative Test Failed', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsTestingAI(false);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="auto" />
@@ -268,6 +288,16 @@ export default function App() {
           >
             <Text style={styles.aiTestButtonText}>
               {isTestingAI ? '🧪 Test' : '🤖 AI'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.creativeButton]} 
+            onPress={testCreativeDrawingHandler}
+            disabled={isTestingAI}
+          >
+            <Text style={styles.creativeButtonText}>
+              🎨 Sun
             </Text>
           </TouchableOpacity>
         </View>
@@ -446,6 +476,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#6c757d',
   },
   aiTestButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  creativeButton: {
+    backgroundColor: '#ff6b35',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.8,
+    alignItems: 'center',
+  },
+  creativeButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
