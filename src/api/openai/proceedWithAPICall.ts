@@ -1,110 +1,152 @@
 import { openaiConfig } from './config';
-import { OpenAIResponseSchema, OpenAIResponse } from './types';
+import { OpenAIResponseSchema, OpenAIResponse, commandSchema, validateDrawingCommands, DrawingCommands } from './types';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 
-export async function proceedWithAPICall(base64Image: string): Promise<any[]> {
+// Error classes (imported from drawingCommands.ts)
+class DrawingAPIError extends Error {
+  constructor(message: string, public status?: number, public response?: string) {
+    super(message);
+    this.name = 'DrawingAPIError';
+  }
+}
+
+class DrawingValidationError extends Error {
+  constructor(message: string, public details?: unknown) {
+    super(message);
+    this.name = 'DrawingValidationError';
+  }
+}
+
+export async function proceedWithAPICall(base64Image: string): Promise<DrawingCommands> {
   console.log('🧪 Starting AI integration test...');
   console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
 
-  // Step 1: Export canvas as base64 image
-  console.log('📸 Exporting canvas...');
+  // Step 1: Validate base64 image
+  console.log('📸 Validating canvas image...');
   if (!base64Image) {
-    throw new Error('Failed to export canvas image');
+    throw new DrawingAPIError('Failed to export canvas image');
   }
-
-  console.log('✅ Canvas exported successfully');
+  console.log('✅ Canvas image validated successfully');
 
   // Step 2: Send to OpenAI Vision API
   console.log('🤖 Sending to OpenAI Vision API...');
 
-  const response = await fetch(openaiConfig.baseUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiConfig.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `You are looking at a drawing on a 1000x1000 pixel canvas. The coordinate system has:
+  try {
+    const response = await fetch(openaiConfig.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `You are looking at a drawing on a 1000x1000 pixel canvas. The coordinate system has:
 - Top-left corner: (0, 0)
 - Top-right corner: (1000, 0)  
 - Bottom-left corner: (0, 1000)
 - Bottom-right corner: (1000, 1000)
 
-Please:
-1. Analyze what's currently drawn
-2. Add ONE simple complementary line or shape
-3. Ensure ALL coordinates are within 0-1000 range
-4. Respond with ONLY a JSON array of drawing commands
+Please analyze what's currently drawn and add ONE simple complementary shape or line that naturally completes or enhances the drawing.
 
-Format: [{"type": "moveTo", "x": number, "y": number}, {"type": "lineTo", "x": number, "y": number}, ...]
+Respond with drawing commands following this structure:
+- Each command must have a "type" field
+- Use integer coordinates only
+- Available command types: moveTo, lineTo, quadTo, cubicTo, addCircle
+- ALL coordinates must be within canvas bounds (0-1000 for both x and y)
+- Circle radius must be between 1 and 500
+- Keep it simple (3-8 commands max for lines, or 1 addCircle command)
 
-Important: 
-- x and y must be integers between 0 and 1000
-- Start with moveTo, then use lineTo commands
-- Keep it simple (3-8 commands max)`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: base64Image
+Examples:
+For a circle: {"type": "addCircle", "cx": 500, "cy": 500, "radius": 100}
+For lines: {"type": "moveTo", "x": 100, "y": 100}, {"type": "lineTo", "x": 200, "y": 200}`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: base64Image
+                }
               }
-            }
-          ]
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'DrawingCommandsSchema',
+            schema: zodToJsonSchema(z.object({
+              commands: z.array(commandSchema)
+            }).strict())
+          }
         }
-      ],
-      max_tokens: 1000
-    })
-  });
+      })
+    });
 
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error('❌ OpenAI API Error:', response.status, errorData);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ OpenAI API Error:', response.status, errorText);
 
-    if (response.status === 401) {
-      throw new Error('Invalid API key. Please check your EXPO_PUBLIC_OPENAI_API_KEY in .env file.');
-    } else if (response.status === 429) {
-      throw new Error('Rate limit exceeded. Please try again later.');
-    } else {
-      throw new Error(`OpenAI API error (${response.status}): ${errorData}`);
+      if (response.status === 401) {
+        throw new DrawingAPIError('Invalid API key. Please check your EXPO_PUBLIC_OPENAI_API_KEY in .env file.', response.status, errorText);
+      } else if (response.status === 429) {
+        throw new DrawingAPIError('Rate limit exceeded. Please try again later.', response.status, errorText);
+      } else {
+        throw new DrawingAPIError(`OpenAI API error (${response.status}): ${errorText}`, response.status, errorText);
+      }
     }
-  }
 
-  const data: OpenAIResponse = await response.json();
-  OpenAIResponseSchema.parse(data);
-  console.log('🎉 OpenAI API Response:', JSON.stringify(data, null, 2));
+    const data: OpenAIResponse = await response.json();
+    console.log('🎉 OpenAI API Response:', JSON.stringify(data, null, 2));
 
-  if (data.choices && data.choices[0] && data.choices[0].message) {
+    // Validate OpenAI response structure
+    try {
+      OpenAIResponseSchema.parse(data);
+    } catch (error) {
+      console.error('OpenAI response validation failed:', error);
+      throw new DrawingValidationError('Invalid OpenAI response format', error);
+    }
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new DrawingValidationError('Unexpected API response format - missing choices or message');
+    }
+
     let aiResponse = data.choices[0].message.content;
     console.log('🤖 AI Generated Commands:', aiResponse);
 
-    // Remove backticks and parse the JSON
+    // Clean the response (shouldn't need this with json_schema but keeping as fallback)
     aiResponse = aiResponse.replace(/```json|```/g, '').trim();
-    const commands = JSON.parse(aiResponse);
 
-    if (!Array.isArray(commands)) {
-      throw new Error('AI response is not an array of commands');
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiResponse);
+    } catch (error) {
+      console.error('JSON parsing failed:', error);
+      throw new DrawingValidationError('Failed to parse AI response as JSON', error);
     }
 
-    console.log('✅ Successfully parsed AI commands:', commands);
+    if (!parsedResponse.commands || !Array.isArray(parsedResponse.commands)) {
+      console.error('Invalid commands array:', parsedResponse);
+      throw new DrawingValidationError('AI response does not contain a valid commands array');
+    }
 
-    // Convert array-format commands to object format
-    return commands.map(cmd => {
-      const type = Object.keys(cmd)[0];
-      const [x, y] = cmd[type];
+    // Validate and transform the commands using our enhanced validation
+    const validatedCommands = validateDrawingCommands(parsedResponse.commands);
+    console.log('✅ Successfully validated AI commands:', validatedCommands);
 
-      return {
-        type: type,
-        x: x,
-        y: y
-      };
-    });
-  } else {
-    throw new Error('Unexpected API response format');
+    return validatedCommands;
+
+  } catch (error) {
+    if (error instanceof DrawingAPIError || error instanceof DrawingValidationError) {
+      throw error;
+    }
+    console.error('❌ Unexpected error:', error);
+    throw new Error('An unexpected error occurred while processing drawing commands');
   }
 } 
