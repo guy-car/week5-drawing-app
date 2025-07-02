@@ -299,6 +299,8 @@ Based on your analysis, create commands for the specific new elements you descri
   }
 }
 
+
+///// CURRENT PROMPT
 export async function analyzeThenDrawWithContext(base64Image: string, existingCommands: DrawingCommand[]): Promise<DrawingCommands> {
   console.log('🔍 Starting context-aware two-step AI analysis...');
   console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
@@ -417,15 +419,25 @@ Be detailed and specific about locations using the 1000x1000 coordinate system, 
 
 "${analysis}"
 
-Now generate ONLY the NEW elements you want to add (do not redraw existing shapes). 
+Now generate ONLY the NEW elements you want to add (do not redraw existing shapes).
 
-IMPORTANT - Use the existing command patterns as your guide:
+ARTISTIC APPROACH:
+You are a creative artist collaborating with a human. Your goal is to add meaningful elements that enhance the artistic composition.
 
-SCALE MATCHING: Look at the existing commands to understand:
-- The user's preferred coordinate ranges
-- Typical distances between points in lineTo sequences
-- Preferred circle sizes
-- Overall scale of their drawing
+EXPANDED COMMAND PALETTE:
+You now have these expressive tools:
+
+GEOMETRIC SHAPES:
+- addCircle: Perfect circles (eyes, dots, suns)
+- addOval: Ellipses (faces, eggs, organic shapes)  
+- addRect: Rectangles (buildings, frames, geometric elements)
+- addArc: Partial circles (smiles, eyebrows, rainbows)
+- addRoundRect: Rounded rectangles (buttons, panels, soft geometric elements)
+
+FLOWING LINES:
+- moveTo + lineTo: Sharp, precise lines
+- moveTo + quadTo: Smooth curves (hair, flowing elements)
+- moveTo + cubicTo: Complex curves (artistic flourishes)
 
 STYLE MATCHING: Match the user's drawing approach:
 - If they use many small lineTo steps, use similar small steps
@@ -433,25 +445,28 @@ STYLE MATCHING: Match the user's drawing approach:
 - If they draw circles of certain sizes, use similar proportions
 - Follow their spacing and positioning patterns
 
-COMMAND GENERATION RULES:
+COMMAND EXAMPLES:
 
-FOR CIRCLES (like eyes): Use addCircle only
-- Example: {"type": "addCircle", "cx": 525, "cy": 450, "radius": 20}
+FOR GEOMETRIC SHAPES:
+{"type": "addCircle", "cx": 525, "cy": 450, "radius": 20}
+{"type": "addOval", "x": 400, "y": 300, "width": 60, "height": 40}
+{"type": "addRect", "x": 200, "y": 200, "width": 100, "height": 80}
+{"type": "addArc", "x": 470, "y": 480, "width": 60, "height": 30, "startAngle": 0, "sweepAngle": 180}
+{"type": "addRoundRect", "x": 300, "y": 300, "width": 120, "height": 80, "rx": 15, "ry": 15}
 
-FOR LINES/CURVES (like hair, eyebrows, ears): Start with moveTo, then connect
-- Example eyebrow: 
-  {"type": "moveTo", "x": 470, "y": 430},
-  {"type": "quadTo", "x1": 480, "y1": 425, "x2": 490, "y2": 430}
+FOR LINES/CURVES:
+{"type": "moveTo", "x": 470, "y": 430},
+{"type": "quadTo", "x1": 480, "y1": 425, "x2": 490, "y2": 430}
 
-- Example ear:
-  {"type": "moveTo", "x": 350, "y": 480},
-  {"type": "quadTo", "x1": 330, "y1": 500, "x2": 350, "y2": 520}
+{"type": "moveTo", "x": 350, "y": 480},
+{"type": "cubicTo", "x1": 330, "y1": 500, "x2": 320, "y2": 520, "x3": 350, "y3": 540}
 
 RULES:
-- Start each new shape with moveTo (except circles)
+- Start each new shape with moveTo (except for geometric shapes)
 - Only add the NEW elements from your intention
-- All coordinates 0-1000, radius 1-500
-- Generate 3-15 commands total
+- All coordinates 0-1000
+- Circle radius 1-500
+- Generate 3-20 commands total
 - MATCH the scale and style patterns from existing commands
 
 Based on your context-aware analysis, create commands for the specific new elements you described, ensuring they match the user's established drawing style and scale.`
