@@ -35,10 +35,8 @@ export async function riffOnSketch(
       stream: supportsStream,
       response_format: { 
         type: 'json_schema',
-        json_schema: {
-          name: 'RiffResponse',
-          schema: riffResponseJsonSchema
-        }
+        schema: riffResponseJsonSchema,
+        name: 'RiffResponse'
       },
       messages: [{
         role: 'user',

@@ -3,8 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
-import { riffOnSketch } from './src/api/openai/riffOnSketch';
-import { VectorSummary } from './src/utils/vectorSummary';
+import { analyzeThenDraw, analyzeThenDrawWithContext } from './src/api/openai';
 import { DrawingCommand } from './src/api/openai/types';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -16,10 +15,9 @@ interface DrawingCanvasRef {
   clear: () => void;
   handleZoom: (increment: boolean) => void;
   exportCanvas: () => Promise<string | null>;
-  exportCanvasWithCommands: () => Promise<{ image: string | null; commands: DrawingCommand[]; summary: VectorSummary }>;
+  exportCanvasWithCommands: () => Promise<{ image: string | null; commands: DrawingCommand[] }>;
   addAIPath: (commands: any[]) => void;
   addDebugGrid: () => void;
-  addAICommandIncremental: (command: DrawingCommand) => void;
 }
 
 export default function App() {
@@ -51,25 +49,33 @@ export default function App() {
     }
 
     setIsTestingAI(true);
-    console.log('🔍 Starting riff-on-sketch AI flow...');
+    console.log('🔍 Starting context-aware two-step AI analysis...');
 
     try {
-      // 1. Export lightweight image + vector summary
+      // Use the new exportCanvasWithCommands function to get both image and commands
       const canvasData = await canvasRef.current.exportCanvasWithCommands();
-      if (!canvasData.image) throw new Error('Failed to export canvas image');
+      if (!canvasData.image) throw new Error('Failed to export canvas');
 
-      console.log(`📊 User commands: ${canvasData.commands.length}`);
-      console.log('📐 Vector summary:', canvasData.summary);
+      console.log(`📊 Sending ${canvasData.commands.length} user commands as context to AI`);
+      console.log('🎯 First few commands:', canvasData.commands.slice(0, 3));
 
-      // 2. Stream AI commands and render incrementally
-      await riffOnSketch(canvasData.image, canvasData.summary as VectorSummary, (cmd) => {
-        canvasRef.current?.addAICommandIncremental(cmd);
-      });
+      // Use the new context-aware function that takes both image and existing commands
+      const commands = await analyzeThenDrawWithContext(canvasData.image, canvasData.commands);
+      console.log('✅ Successfully parsed context-aware AI commands:', commands);
 
-      Alert.alert('🎉 AI Riff Complete', 'The AI has added its strokes to your sketch!', [{ text: 'OK' }]);
+      // Use our addAIPath method to render the commands
+      canvasRef.current.addAIPath(commands);
+
+      Alert.alert('🎨 Context-Aware AI Success!', 
+        `✅ Canvas exported and context-aware AI commands rendered!\n\n` +
+        `📊 Context: ${canvasData.commands.length} user commands\n` +
+        `🤖 AI added: ${commands.length} new commands\n\n` +
+        `Check console for full analysis.`, 
+        [{ text: 'OK' }]
+      );
     } catch (error) {
-      console.error('❌ AI Integration Failed:', error);
-      Alert.alert('AI Draw Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
+      console.error('❌ Context-Aware AI Integration Test Failed:', error);
+      Alert.alert('AI Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
     } finally {
       setIsTestingAI(false);
     }
