@@ -9,7 +9,7 @@ import Animated, {
   useDerivedValue
 } from 'react-native-reanimated';
 import { DrawingCommand } from '../src/api/openai/types';
-import { vectorSummary, VectorSummary } from '../src/utils/vectorSummary';
+
 
 const BASE_CANVAS_SIZE = 1000;
 const MIN_ZOOM = 0.5;
@@ -122,7 +122,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ mode, 
       const finalImage = surface.makeImageSnapshot();
       if (!finalImage) {
         console.error('Failed to create resized image snapshot');
-        surface.dispose?.();
         return null;
       }
 
@@ -130,10 +129,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ mode, 
       const bytes = format === 'jpeg' 
         ? finalImage.encodeToBytes(ImageFormat.JPEG, quality * 100) // JPEG quality is 0-100
         : finalImage.encodeToBytes();
-
-      // Clean up Skia resources
-      surface.dispose?.();
-      finalImage.dispose?.();
 
       if (!bytes) {
         console.error('Failed to encode image to bytes');
