@@ -8,6 +8,7 @@ import Animated, {
   withSpring,
   useDerivedValue
 } from 'react-native-reanimated';
+import { DrawingCommand } from '../src/api/openai/types';
 
 const BASE_CANVAS_SIZE = 1000;
 const MIN_ZOOM = 0.5;
@@ -25,7 +26,7 @@ interface DrawingCanvasRef {
   clear: () => void;
   handleZoom: (increment: boolean) => void;
   exportCanvas: () => Promise<string | null>;
-  addAIPath: (commands: { type: string; x: number; y: number }[]) => void;
+  addAIPath: (commands: DrawingCommand[]) => void;
   addDebugGrid: () => void;
 }
 
@@ -113,40 +114,106 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       }
     };
 
-    const addAIPath = (commands: { type: string; x: number; y: number }[]) => {
+    const addAIPath = (commands: DrawingCommand[]) => {
       try {
         console.log('🎯 AI Commands received:', commands);
         
-        // Validate and log coordinates
-        const validatedCommands = commands.map((command, index) => {
-          const x = Math.max(0, Math.min(1000, command.x));
-          const y = Math.max(0, Math.min(1000, command.y));
-          
-          if (x !== command.x || y !== command.y) {
-            console.warn(`⚠️ Command ${index}: Clamped (${command.x}, ${command.y}) to (${x}, ${y})`);
-          }
-          
-          console.log(`📍 Command ${index}: ${command.type} to (${x}, ${y})`);
-          return { ...command, x, y };
-        });
-        
         const aiPath = Skia.Path.Make();
         
-        validatedCommands.forEach((command) => {
-          switch (command.type.toLowerCase()) {
-            case 'moveto':
-              aiPath.moveTo(command.x, command.y);
+        commands.forEach((command, index) => {
+          console.log(`📍 Processing command ${index}: ${command.type}`);
+          
+          switch (command.type) {
+            case 'moveTo': {
+              // Validate and clamp coordinates
+              const x = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x));
+              const y = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y));
+              
+              if (x !== command.x || y !== command.y) {
+                console.warn(`⚠️ MoveTo command ${index}: Clamped (${command.x}, ${command.y}) to (${x}, ${y})`);
+              }
+              
+              aiPath.moveTo(x, y);
+              console.log(`✅ MoveTo: (${x}, ${y})`);
               break;
-            case 'lineto':
-              aiPath.lineTo(command.x, command.y);
+            }
+            
+            case 'lineTo': {
+              // Validate and clamp coordinates
+              const x = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x));
+              const y = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y));
+              
+              if (x !== command.x || y !== command.y) {
+                console.warn(`⚠️ LineTo command ${index}: Clamped (${command.x}, ${command.y}) to (${x}, ${y})`);
+              }
+              
+              aiPath.lineTo(x, y);
+              console.log(`✅ LineTo: (${x}, ${y})`);
               break;
+            }
+            
+            case 'quadTo': {
+              // Validate and clamp control point and end point coordinates
+              const x1 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x1));
+              const y1 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y1));
+              const x2 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x2));
+              const y2 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y2));
+              
+              if (x1 !== command.x1 || y1 !== command.y1 || x2 !== command.x2 || y2 !== command.y2) {
+                console.warn(`⚠️ QuadTo command ${index}: Clamped coordinates`);
+                console.warn(`  Control: (${command.x1}, ${command.y1}) to (${x1}, ${y1})`);
+                console.warn(`  End: (${command.x2}, ${command.y2}) to (${x2}, ${y2})`);
+              }
+              
+              aiPath.quadTo(x1, y1, x2, y2);
+              console.log(`✅ QuadTo: control(${x1}, ${y1}) end(${x2}, ${y2})`);
+              break;
+            }
+            
+            case 'cubicTo': {
+              // Validate and clamp all control points and end point coordinates
+              const x1 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x1));
+              const y1 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y1));
+              const x2 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x2));
+              const y2 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y2));
+              const x3 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.x3));
+              const y3 = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.y3));
+              
+              if (x1 !== command.x1 || y1 !== command.y1 || x2 !== command.x2 || 
+                  y2 !== command.y2 || x3 !== command.x3 || y3 !== command.y3) {
+                console.warn(`⚠️ CubicTo command ${index}: Clamped coordinates`);
+                console.warn(`  Control1: (${command.x1}, ${command.y1}) to (${x1}, ${y1})`);
+                console.warn(`  Control2: (${command.x2}, ${command.y2}) to (${x2}, ${y2})`);
+                console.warn(`  End: (${command.x3}, ${command.y3}) to (${x3}, ${y3})`);
+              }
+              
+              aiPath.cubicTo(x1, y1, x2, y2, x3, y3);
+              console.log(`✅ CubicTo: control1(${x1}, ${y1}) control2(${x2}, ${y2}) end(${x3}, ${y3})`);
+              break;
+            }
+            
+            case 'addCircle': {
+              // Validate and clamp center coordinates and radius
+              const cx = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.cx));
+              const cy = Math.max(0, Math.min(BASE_CANVAS_SIZE, command.cy));
+              const radius = Math.max(1, Math.min(BASE_CANVAS_SIZE / 2, command.radius)); // Ensure positive radius
+              
+              if (cx !== command.cx || cy !== command.cy || radius !== command.radius) {
+                console.warn(`⚠️ AddCircle command ${index}: Clamped (${command.cx}, ${command.cy}, r=${command.radius}) to (${cx}, ${cy}, r=${radius})`);
+              }
+              
+              aiPath.addCircle(cx, cy, radius);
+              console.log(`✅ AddCircle: center(${cx}, ${cy}) radius=${radius}`);
+              break;
+            }
+            
             default:
-              console.warn(`Unknown command type: ${command.type}`);
+              console.warn(`❌ Unknown command type: ${(command as any).type}`);
           }
         });
         
         setPaths(prevPaths => [...prevPaths, aiPath]);
-        console.log('✅ AI path added successfully');
+        console.log(`✅ AI path added successfully with ${commands.length} commands`);
       } catch (error) {
         console.error('❌ Error adding AI path:', error);
       }
