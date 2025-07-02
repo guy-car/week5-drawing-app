@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
-import { debugAIVision, debugDrawingIntention, testCoordinates, testCreativeDrawing, proceedWithAPICall } from './src/api/openai';
+import { analyzeThenDraw } from './src/api/openai';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -47,13 +47,13 @@ export default function App() {
     }
 
     setIsTestingAI(true);
-    console.log('🧪 Starting AI integration test...');
+    console.log('🔍 Starting two-step AI analysis...');
 
     try {
       const base64Image = await canvasRef.current.exportCanvas();
       if (!base64Image) throw new Error('Failed to export canvas');
 
-      const commands = await proceedWithAPICall(base64Image);
+      const commands = await analyzeThenDraw(base64Image);
       console.log('✅ Successfully parsed AI commands:', commands);
 
       // Use our addAIPath method to render the commands
@@ -63,137 +63,6 @@ export default function App() {
     } catch (error) {
       console.error('❌ AI Integration Test Failed:', error);
       Alert.alert('AI Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
-    } finally {
-      setIsTestingAI(false);
-    }
-  };
-
-  const debugAIVisionHandler = async () => {
-    if (!canvasRef.current) {
-      Alert.alert('Error', 'Canvas not available');
-      return;
-    }
-    setIsTestingAI(true);
-    console.log('🔍 Debugging AI Vision...');
-
-    try {
-      const base64Image = await canvasRef.current.exportCanvas();
-      if (!base64Image) throw new Error('Failed to export canvas');
-
-      const description = await debugAIVision(base64Image);
-      console.log('🤖 AI Vision Analysis:', description);
-      Alert.alert('AI Vision Debug', description, [{ text: 'OK' }]);
-    } catch (error) {
-      console.error('❌ AI Vision Debug Failed:', error);
-      Alert.alert('Debug Failed', error instanceof Error ? error.message : 'Unknown error', [{ text: 'OK' }]);
-    } finally {
-      setIsTestingAI(false);
-    }
-  };
-
-  const debugDrawingIntentionHandler = async () => {
-    if (!canvasRef.current) {
-      Alert.alert('Error', 'Canvas not available');
-      return;
-    }
-    setIsTestingAI(true);
-    console.log('🎯 Debugging AI Drawing Intention...');
-
-    try {
-      const base64Image = await canvasRef.current.exportCanvas();
-      if (!base64Image) throw new Error('Failed to export canvas');
-
-      const intention = await debugDrawingIntention(base64Image);
-      console.log('🎯 AI Drawing Intention:', intention);
-      Alert.alert('AI Drawing Intention', intention, [{ text: 'OK' }]);
-    } catch (error) {
-      console.error('❌ AI Drawing Intention Debug Failed:', error);
-      Alert.alert('Intention Debug Failed', error instanceof Error ? error.message : 'Unknown error', [{ text: 'OK' }]);
-    } finally {
-      setIsTestingAI(false);
-    }
-  };
-
-  const testCoordinatesHandler = async () => {
-    if (!canvasRef.current) {
-      Alert.alert('Error', 'Canvas not available');
-      return;
-    }
-    setIsTestingAI(true);
-    console.log('📏 Testing Coordinate Understanding...');
-
-    try {
-      const commands = await testCoordinates();
-      console.log('✅ Successfully parsed AI commands:', commands);
-
-      // Validate all commands have valid coordinates based on their type
-      const hasInvalidCommands = commands.some(cmd => {
-        switch (cmd.type) {
-          case 'moveTo':
-          case 'lineTo':
-            return isNaN(cmd.x) || isNaN(cmd.y) || 
-                   cmd.x < 0 || cmd.x > 1000 || 
-                   cmd.y < 0 || cmd.y > 1000;
-          
-          case 'quadTo':
-            return isNaN(cmd.x1) || isNaN(cmd.y1) || isNaN(cmd.x2) || isNaN(cmd.y2) ||
-                   cmd.x1 < 0 || cmd.x1 > 1000 || cmd.y1 < 0 || cmd.y1 > 1000 ||
-                   cmd.x2 < 0 || cmd.x2 > 1000 || cmd.y2 < 0 || cmd.y2 > 1000;
-          
-          case 'cubicTo':
-            return isNaN(cmd.x1) || isNaN(cmd.y1) || isNaN(cmd.x2) || isNaN(cmd.y2) || 
-                   isNaN(cmd.x3) || isNaN(cmd.y3) ||
-                   cmd.x1 < 0 || cmd.x1 > 1000 || cmd.y1 < 0 || cmd.y1 > 1000 ||
-                   cmd.x2 < 0 || cmd.x2 > 1000 || cmd.y2 < 0 || cmd.y2 > 1000 ||
-                   cmd.x3 < 0 || cmd.x3 > 1000 || cmd.y3 < 0 || cmd.y3 > 1000;
-          
-          case 'addCircle':
-            return isNaN(cmd.cx) || isNaN(cmd.cy) || isNaN(cmd.radius) ||
-                   cmd.cx < 0 || cmd.cx > 1000 || cmd.cy < 0 || cmd.cy > 1000 ||
-                   cmd.radius < 1 || cmd.radius > 500;
-          
-          default:
-            return true; // Unknown command type is invalid
-        }
-      });
-
-      if (hasInvalidCommands) {
-        throw new Error('Some commands have invalid coordinates');
-      }
-
-      // Use our addAIPath method to render the commands
-      canvasRef.current.addAIPath(commands);
-
-      Alert.alert('Coordinate Test Complete', `✅ AI generated ${commands.length} commands to draw a circle.\n\nCheck the canvas to verify the circle position and shape.`, [{ text: 'OK' }]);
-    } catch (error) {
-      console.error('❌ Coordinate Test Failed:', error);
-      Alert.alert('Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
-    } finally {
-      setIsTestingAI(false);
-    }
-  };
-
-  const addDebugGrid = () => {
-    if (canvasRef.current) {
-      canvasRef.current.addDebugGrid();
-    }
-  };
-
-  const testCreativeDrawingHandler = async () => {
-    setIsTestingAI(true);
-    console.log('🎨 Testing AI Creative Drawing...');
-
-    try {
-      const commands = await testCreativeDrawing();
-      console.log('🎨 Creative Commands received:', commands);
-      
-      if (canvasRef.current && commands.length > 0) {
-        canvasRef.current.addAIPath(commands);
-        Alert.alert('Success!', `AI drew ${commands.length} creative commands for a sun!`);
-      }
-    } catch (error) {
-      console.error('❌ Creative Drawing Failed:', error);
-      Alert.alert('Creative Test Failed', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsTestingAI(false);
     }
@@ -239,68 +108,17 @@ export default function App() {
         </View>
       </View>
 
-      {/* AI Test and Debug Buttons */}
+      {/* AI Button */}
       <View style={styles.aiTestContainer}>
-        <View style={styles.buttonRow}>
-          <TouchableOpacity 
-            style={[styles.debugButton]} 
-            onPress={debugAIVisionHandler}
-            disabled={isTestingAI}
-          >
-            <Text style={styles.debugButtonText}>
-              🔍 Vision
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.intentionButton]} 
-            onPress={debugDrawingIntentionHandler}
-            disabled={isTestingAI}
-          >
-            <Text style={styles.intentionButtonText}>
-              🎯 Intent
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.coordButton]} 
-            onPress={testCoordinatesHandler}
-            disabled={isTestingAI}
-          >
-            <Text style={styles.coordButtonText}>
-              📏 Test
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.gridButton]} 
-            onPress={addDebugGrid}
-          >
-            <Text style={styles.gridButtonText}>
-              📐 Grid
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.aiTestButton, isTestingAI && styles.aiTestButtonDisabled]} 
-            onPress={proceedWithAPICallHandler}
-            disabled={isTestingAI}
-          >
-            <Text style={styles.aiTestButtonText}>
-              {isTestingAI ? '🧪 Test' : '🤖 AI'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.creativeButton]} 
-            onPress={testCreativeDrawingHandler}
-            disabled={isTestingAI}
-          >
-            <Text style={styles.creativeButtonText}>
-              🎨 Sun
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={[styles.aiTestButton, isTestingAI && styles.aiTestButtonDisabled]} 
+          onPress={proceedWithAPICallHandler}
+          disabled={isTestingAI}
+        >
+          <Text style={styles.aiTestButtonText}>
+            {isTestingAI ? '🧪 Processing...' : '🤖 AI Draw'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Canvas */}
@@ -405,71 +223,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 10,
-  },
-  debugButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.8,
-    alignItems: 'center',
-  },
-  debugButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  intentionButton: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: 'center',
-  },
-  intentionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  coordButton: {
-    backgroundColor: '#e83e8c',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.8,
-    alignItems: 'center',
-  },
-  coordButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  gridButton: {
-    backgroundColor: '#6f42c1',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.6,
-    alignItems: 'center',
-  },
-  gridButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
   aiTestButton: {
     backgroundColor: '#28a745',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: 30,
+    paddingVertical: 12,
     borderRadius: 8,
-    flex: 0.8,
+    minWidth: 150,
     alignItems: 'center',
   },
   aiTestButtonDisabled: {
@@ -477,20 +238,7 @@ const styles = StyleSheet.create({
   },
   aiTestButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  creativeButton: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 0.8,
-    alignItems: 'center',
-  },
-  creativeButtonText: {
-    color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   canvasContainer: {

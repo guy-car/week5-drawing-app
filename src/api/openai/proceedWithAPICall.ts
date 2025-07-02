@@ -2,6 +2,7 @@ import { openaiConfig } from './config';
 import { OpenAIResponseSchema, OpenAIResponse, commandSchema, validateDrawingCommands, DrawingCommands } from './types';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { z } from 'zod';
+import { expPrompt2, expPrompt1, expPrompt3, expPrompt4, expPrompt5 } from './experiments'
 
 // Error classes (imported from drawingCommands.ts)
 class DrawingAPIError extends Error {
@@ -47,25 +48,7 @@ export async function proceedWithAPICall(base64Image: string): Promise<DrawingCo
             content: [
               {
                 type: 'text',
-                text: `You are looking at a drawing on a 1000x1000 pixel canvas. The coordinate system has:
-- Top-left corner: (0, 0)
-- Top-right corner: (1000, 0)  
-- Bottom-left corner: (0, 1000)
-- Bottom-right corner: (1000, 1000)
-
-Please analyze what's currently drawn and add ONE simple complementary shape or line that naturally completes or enhances the drawing.
-
-Respond with drawing commands following this structure:
-- Each command must have a "type" field
-- Use integer coordinates only
-- Available command types: moveTo, lineTo, quadTo, cubicTo, addCircle
-- ALL coordinates must be within canvas bounds (0-1000 for both x and y)
-- Circle radius must be between 1 and 500
-- Keep it simple (3-8 commands max for lines, or 1 addCircle command)
-
-Examples:
-For a circle: {"type": "addCircle", "cx": 500, "cy": 500, "radius": 100}
-For lines: {"type": "moveTo", "x": 100, "y": 100}, {"type": "lineTo", "x": 200, "y": 200}`
+                text: expPrompt5
               },
               {
                 type: 'image_url',
@@ -148,5 +131,170 @@ For lines: {"type": "moveTo", "x": 100, "y": 100}, {"type": "lineTo", "x": 200, 
     }
     console.error('❌ Unexpected error:', error);
     throw new Error('An unexpected error occurred while processing drawing commands');
+  }
+}
+
+export async function analyzeThenDraw(base64Image: string): Promise<DrawingCommands> {
+  console.log('🔍 Starting two-step AI analysis...');
+  console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
+
+  if (!base64Image) {
+    throw new DrawingAPIError('Failed to export canvas image');
+  }
+
+  try {
+    // STEP 1: Combined Vision + Intention Analysis
+    console.log('📋 Step 1: Getting AI understanding (vision + intention)...');
+    
+    const analysisResponse = await fetch(openaiConfig.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this drawing on a 1000x1000 pixel canvas where (0,0) is top-left and (1000,1000) is bottom-right.
+
+Please provide:
+
+1. VISION: What do you see? Describe shapes, their approximate coordinates, and spatial relationships.
+
+2. INTENTION: What would naturally complete or enhance this drawing? Be specific about:
+   - What you want to add
+   - Where it should go (approximate coordinates)
+   - Why this addition makes sense
+
+Be detailed and specific about locations using the 1000x1000 coordinate system.`
+              },
+              {
+                type: 'image_url',
+                image_url: { url: base64Image }
+              }
+            ]
+          }
+        ],
+        max_tokens: 800
+      })
+    });
+
+    if (!analysisResponse.ok) {
+      const errorText = await analysisResponse.text();
+      throw new DrawingAPIError(`Analysis API error (${analysisResponse.status}): ${errorText}`, analysisResponse.status, errorText);
+    }
+
+    const analysisData: OpenAIResponse = await analysisResponse.json();
+    const analysis = analysisData.choices[0].message.content;
+    console.log('🧠 AI Analysis:', analysis);
+
+    // STEP 2: Generate Drawing Commands Based on Analysis
+    console.log('⚡ Step 2: Generating drawing commands based on analysis...');
+    
+    const commandResponse = await fetch(openaiConfig.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Based on your previous analysis:
+
+"${analysis}"
+
+Now generate ONLY the NEW elements you want to add (do not redraw existing shapes). 
+
+IMPORTANT - Each shape must be a proper connected path:
+
+FOR CIRCLES (like eyes): Use addCircle only
+- Example: {"type": "addCircle", "cx": 525, "cy": 450, "radius": 20}
+
+FOR LINES/CURVES (like hair, eyebrows, ears): Start with moveTo, then connect
+- Example eyebrow: 
+  {"type": "moveTo", "x": 470, "y": 430},
+  {"type": "quadTo", "x1": 480, "y1": 425, "x2": 490, "y2": 430}
+
+- Example ear:
+  {"type": "moveTo", "x": 350, "y": 480},
+  {"type": "quadTo", "x1": 330, "y1": 500, "x2": 350, "y2": 520}
+
+RULES:
+- Start each new shape with moveTo (except circles)
+- Only add the NEW elements from your intention
+- All coordinates 0-1000, radius 1-500
+- Generate 3-15 commands total
+
+Based on your analysis, create commands for the specific new elements you described.`
+              },
+              {
+                type: 'image_url',
+                image_url: { url: base64Image }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'DrawingCommandsSchema',
+            schema: zodToJsonSchema(z.object({
+              commands: z.array(commandSchema)
+            }).strict())
+          }
+        }
+      })
+    });
+
+    if (!commandResponse.ok) {
+      const errorText = await commandResponse.text();
+      throw new DrawingAPIError(`Commands API error (${commandResponse.status}): ${errorText}`, commandResponse.status, errorText);
+    }
+
+    const commandData: OpenAIResponse = await commandResponse.json();
+    console.log('🎨 AI Commands Response:', JSON.stringify(commandData, null, 2));
+
+    // Validate and parse the commands
+    OpenAIResponseSchema.parse(commandData);
+    
+    let aiResponse = commandData.choices[0].message.content;
+    aiResponse = aiResponse.replace(/```json|```/g, '').trim();
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiResponse);
+    } catch (error) {
+      console.error('JSON parsing failed:', error);
+      throw new DrawingValidationError('Failed to parse AI response as JSON', error);
+    }
+
+    if (!parsedResponse.commands || !Array.isArray(parsedResponse.commands)) {
+      console.error('Invalid commands array:', parsedResponse);
+      throw new DrawingValidationError('AI response does not contain a valid commands array');
+    }
+
+    const validatedCommands = validateDrawingCommands(parsedResponse.commands);
+    console.log('✅ Two-step analysis complete! Generated commands:', validatedCommands);
+
+    return validatedCommands;
+
+  } catch (error) {
+    if (error instanceof DrawingAPIError || error instanceof DrawingValidationError) {
+      throw error;
+    }
+    console.error('❌ Unexpected error in two-step analysis:', error);
+    throw new Error('An unexpected error occurred during two-step drawing analysis');
   }
 } 
