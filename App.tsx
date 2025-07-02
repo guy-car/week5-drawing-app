@@ -126,12 +126,36 @@ export default function App() {
       const commands = await testCoordinates();
       console.log('✅ Successfully parsed AI commands:', commands);
 
-      // Validate all commands have valid coordinates
-      const hasInvalidCommands = commands.some(
-        cmd => isNaN(cmd.x) || isNaN(cmd.y) || 
-              cmd.x < 0 || cmd.x > 1000 || 
-              cmd.y < 0 || cmd.y > 1000
-      );
+      // Validate all commands have valid coordinates based on their type
+      const hasInvalidCommands = commands.some(cmd => {
+        switch (cmd.type) {
+          case 'moveTo':
+          case 'lineTo':
+            return isNaN(cmd.x) || isNaN(cmd.y) || 
+                   cmd.x < 0 || cmd.x > 1000 || 
+                   cmd.y < 0 || cmd.y > 1000;
+          
+          case 'quadTo':
+            return isNaN(cmd.x1) || isNaN(cmd.y1) || isNaN(cmd.x2) || isNaN(cmd.y2) ||
+                   cmd.x1 < 0 || cmd.x1 > 1000 || cmd.y1 < 0 || cmd.y1 > 1000 ||
+                   cmd.x2 < 0 || cmd.x2 > 1000 || cmd.y2 < 0 || cmd.y2 > 1000;
+          
+          case 'cubicTo':
+            return isNaN(cmd.x1) || isNaN(cmd.y1) || isNaN(cmd.x2) || isNaN(cmd.y2) || 
+                   isNaN(cmd.x3) || isNaN(cmd.y3) ||
+                   cmd.x1 < 0 || cmd.x1 > 1000 || cmd.y1 < 0 || cmd.y1 > 1000 ||
+                   cmd.x2 < 0 || cmd.x2 > 1000 || cmd.y2 < 0 || cmd.y2 > 1000 ||
+                   cmd.x3 < 0 || cmd.x3 > 1000 || cmd.y3 < 0 || cmd.y3 > 1000;
+          
+          case 'addCircle':
+            return isNaN(cmd.cx) || isNaN(cmd.cy) || isNaN(cmd.radius) ||
+                   cmd.cx < 0 || cmd.cx > 1000 || cmd.cy < 0 || cmd.cy > 1000 ||
+                   cmd.radius < 1 || cmd.radius > 500;
+          
+          default:
+            return true; // Unknown command type is invalid
+        }
+      });
 
       if (hasInvalidCommands) {
         throw new Error('Some commands have invalid coordinates');

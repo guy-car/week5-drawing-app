@@ -1,149 +1,117 @@
 import { openaiConfig } from './config';
-import { OpenAIResponseSchema, OpenAIResponse } from './types';
+import { OpenAIResponseSchema, OpenAIResponse, commandSchema, validateDrawingCommands, DrawingCommands } from './types';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { drawingCommandsSchema } from './types';
 import { z } from 'zod';
 
-// Create a schema specifically for OpenAI structured output
-const openAICommandSchema = z.union([
-  z.object({
-    type: z.literal('moveTo'),
-    x: z.number().int(),
-    y: z.number().int()
-  }),
-  z.object({
-    type: z.literal('lineTo'), 
-    x: z.number().int(),
-    y: z.number().int()
-  }),
-  z.object({
-    type: z.literal('quadTo'),
-    x1: z.number().int(),
-    y1: z.number().int(),
-    x2: z.number().int(),
-    y2: z.number().int()
-  }),
-  z.object({
-    type: z.literal('cubicTo'),
-    x1: z.number().int(),
-    y1: z.number().int(),
-    x2: z.number().int(),
-    y2: z.number().int(),
-    x3: z.number().int(),
-    y3: z.number().int()
-  }),
-  z.object({
-    type: z.literal('addCircle'),
-    cx: z.number().int(),
-    cy: z.number().int(),
-    radius: z.number().int()
-  })
-]);
+// Error class for API-related errors
+class DrawingAPIError extends Error {
+  constructor(message: string, public status?: number, public response?: string) {
+    super(message);
+    this.name = 'DrawingAPIError';
+  }
+}
 
-export async function testCoordinates(): Promise<any[]> {
-  const response = await fetch(openaiConfig.baseUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiConfig.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Draw a circle centered at x=200, y=200 with radius 50.
+// Error class for validation errors
+class DrawingValidationError extends Error {
+  constructor(message: string, public details?: unknown) {
+    super(message);
+    this.name = 'DrawingValidationError';
+  }
+}
 
-Respond with an array of drawing commands following this structure:
-- Each command must have a "type" field
-- Use integer coordinates only
-- Available command types: moveTo, lineTo, quadTo, cubicTo, addCircle
-
-For a circle, use a single addCircle command:
-{"type": "addCircle", "cx": 200, "cy": 200, "radius": 50}
-
-Or for lines use moveTo/lineTo:
-{"type": "moveTo", "x": 250, "y": 200}
-{"type": "lineTo", "x": 225, "y": 225}`
-            }
-          ]
-        }
-      ],
-      max_tokens: 500,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'DrawingCommandsSchema',
-          schema: zodToJsonSchema(z.object({
-            commands: z.array(openAICommandSchema)
-          }).strict())
-        }
-      }
-    })
-  });
-
-  console.log('Request Body:', JSON.stringify({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'user',
-        content: [
+export async function testCoordinates(): Promise<DrawingCommands> {
+  try {
+    const response = await fetch(openaiConfig.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
           {
-            type: 'text',
-            text: `Draw a circle centered at x=200, y=200 with radius 50.
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Draw a circle centered at x=500, y=500 with radius 100.
 
 Respond with an array of drawing commands following this structure:
 - Each command must have a "type" field
 - Use integer coordinates only
 - Available command types: moveTo, lineTo, quadTo, cubicTo, addCircle
+- Coordinates must be within canvas bounds (0-1000 for both x and y)
+- Circle radius must be between 1 and 500
 
 For a circle, use a single addCircle command:
-{"type": "addCircle", "cx": 200, "cy": 200, "radius": 50}
+{"type": "addCircle", "cx": 500, "cy": 500, "radius": 100}
 
 Or for lines use moveTo/lineTo:
-{"type": "moveTo", "x": 250, "y": 200}
-{"type": "lineTo", "x": 225, "y": 225}`
+{"type": "moveTo", "x": 600, "y": 500}
+{"type": "lineTo", "x": 550, "y": 550}`
+              }
+            ]
           }
-        ]
-      }
-    ],
-    max_tokens: 500,
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'DrawingCommandsSchema',
-        schema: zodToJsonSchema(z.object({
-          commands: z.array(openAICommandSchema)
-        }).strict())
-      }
+        ],
+        max_tokens: 500,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'DrawingCommandsSchema',
+            schema: zodToJsonSchema(z.object({
+              commands: z.array(commandSchema)
+            }).strict())
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API error:', response.status, errorText);
+      throw new DrawingAPIError(`API request failed with status ${response.status}`, response.status, errorText);
     }
-  }));
 
-  if (!response.ok) {
-    console.error('API error:', response.status, await response.text());
-    throw new Error(`API error: ${response.status}`);
+    const data: OpenAIResponse = await response.json();
+    console.log('Raw Response Data:', data);
+
+    try {
+      OpenAIResponseSchema.parse(data);
+    } catch (error) {
+      console.error('OpenAI response validation failed:', error);
+      throw new DrawingValidationError('Invalid OpenAI response format', error);
+    }
+
+    let aiResponse = data.choices[0].message.content;
+
+    // Clean the response
+    aiResponse = aiResponse.replace(/```json|```/g, '').trim();
+    console.log('Parsed AI Response:', aiResponse);
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiResponse);
+    } catch (error) {
+      console.error('JSON parsing failed:', error);
+      throw new DrawingValidationError('Failed to parse AI response as JSON', error);
+    }
+
+    if (!parsedResponse.commands || !Array.isArray(parsedResponse.commands)) {
+      console.error('Invalid commands array:', parsedResponse);
+      throw new DrawingValidationError('AI response does not contain a valid commands array');
+    }
+
+    // Validate and transform the commands using our enhanced validation
+    const validatedCommands = validateDrawingCommands(parsedResponse.commands);
+    console.log('Validated commands:', validatedCommands);
+
+    return validatedCommands;
+  } catch (error) {
+    if (error instanceof DrawingAPIError || error instanceof DrawingValidationError) {
+      throw error;
+    }
+    console.error('Unexpected error:', error);
+    throw new Error('An unexpected error occurred while processing drawing commands');
   }
-
-  const data: OpenAIResponse = await response.json();
-  console.log('Raw Response Data:', data);
-
-  OpenAIResponseSchema.parse(data);
-  let aiResponse = data.choices[0].message.content;
-
-  // Clean the response
-  aiResponse = aiResponse.replace(/```json|```/g, '').trim();
-  console.log('Parsed AI Response:', aiResponse);
-
-  const parsedResponse = JSON.parse(aiResponse);
-
-  if (!parsedResponse.commands || !Array.isArray(parsedResponse.commands)) {
-    console.error('Invalid commands array:', parsedResponse);
-    throw new Error('AI response does not contain a valid commands array');
-  }
-
-  // The commands should now already be in the correct format
-  return parsedResponse.commands;
 } 
