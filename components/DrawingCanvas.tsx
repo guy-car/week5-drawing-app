@@ -26,6 +26,7 @@ interface DrawingCanvasRef {
   clear: () => void;
   handleZoom: (increment: boolean) => void;
   exportCanvas: () => Promise<string | null>;
+  exportCanvasWithCommands: () => Promise<{ image: string | null; commands: DrawingCommand[] }>;
   addAIPath: (commands: DrawingCommand[]) => void;
   addDebugGrid: () => void;
 }
@@ -41,6 +42,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
   ({ mode, onZoomChange, screenWidth, screenHeight }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
+    const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
     const canvasRef = useCanvasRef();
     
     const initialScale = Math.min(screenWidth / BASE_CANVAS_SIZE, screenHeight / BASE_CANVAS_SIZE) * 0.9;
@@ -111,6 +113,31 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       } catch (error) {
         console.error('❌ Error exporting canvas:', error);
         return null;
+      }
+    };
+
+    const exportCanvasWithCommands = async (): Promise<{ image: string | null; commands: DrawingCommand[] }> => {
+      try {
+        // Get the canvas image using the existing exportCanvas function
+        const image = await exportCanvas();
+        
+        // Return both image and captured commands
+        const result = {
+          image,
+          commands: [...userCommands] // Create a copy of the commands array
+        };
+        
+        console.log('✅ Canvas with commands exported successfully');
+        console.log(`📊 Image: ${image ? 'Success' : 'Failed'}, Commands: ${result.commands.length} total`);
+        console.log('🎯 Commands preview:', result.commands.slice(0, 5)); // Show first 5 commands
+        
+        return result;
+      } catch (error) {
+        console.error('❌ Error exporting canvas with commands:', error);
+        return {
+          image: null,
+          commands: []
+        };
       }
     };
 
@@ -241,9 +268,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       clear: () => {
         setPaths([]);
         setCurrentPath(null);
+        setUserCommands([]);
+        console.log('🧹 Cleared canvas and user commands');
       },
       handleZoom,
       exportCanvas,
+      exportCanvasWithCommands,
       addAIPath,
       addDebugGrid,
     }));
@@ -268,15 +298,30 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         // Convert screen coordinates to canvas coordinates
         const canvasCoords = screenToCanvas(locationX, locationY);
         
+        // Round coordinates to integers to match validation expectations
+        const roundedX = Math.round(canvasCoords.x);
+        const roundedY = Math.round(canvasCoords.y);
+        
         const path = Skia.Path.Make();
-        path.moveTo(canvasCoords.x, canvasCoords.y);
+        path.moveTo(roundedX, roundedY);
         
         setCurrentPath({
           path,
-          startX: canvasCoords.x,
-          startY: canvasCoords.y,
-          points: [[canvasCoords.x, canvasCoords.y]]
+          startX: roundedX,
+          startY: roundedY,
+          points: [[roundedX, roundedY]]
         });
+
+        // Capture moveTo command for AI context
+        const moveToCommand: DrawingCommand = {
+          type: 'moveTo',
+          x: roundedX,
+          y: roundedY
+        };
+        
+        setUserCommands(prevCommands => [...prevCommands, moveToCommand]);
+        console.log('📝 Captured moveTo command:', moveToCommand);
+        console.log(`📊 Total user commands captured: ${userCommands.length + 1}`);
       }
     };
 
@@ -290,6 +335,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         // Convert screen coordinates to canvas coordinates
         const canvasCoords = screenToCanvas(locationX, locationY);
         
+        // Round coordinates to integers to match validation expectations
+        const roundedX = Math.round(canvasCoords.x);
+        const roundedY = Math.round(canvasCoords.y);
+        
         const newPath = Skia.Path.Make();
         newPath.moveTo(currentPath.startX, currentPath.startY);
         
@@ -297,14 +346,25 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           newPath.lineTo(x, y);
         });
         
-        newPath.lineTo(canvasCoords.x, canvasCoords.y);
+        newPath.lineTo(roundedX, roundedY);
         
         setCurrentPath({
           path: newPath,
           startX: currentPath.startX,
           startY: currentPath.startY,
-          points: [...currentPath.points, [canvasCoords.x, canvasCoords.y]]
+          points: [...currentPath.points, [roundedX, roundedY]]
         });
+
+        // Capture lineTo command for AI context
+        const lineToCommand: DrawingCommand = {
+          type: 'lineTo',
+          x: roundedX,
+          y: roundedY
+        };
+        
+        setUserCommands(prevCommands => [...prevCommands, lineToCommand]);
+        console.log('📝 Captured lineTo command:', lineToCommand);
+        console.log(`📊 Total user commands captured: ${userCommands.length + 1}`);
       }
     };
 
@@ -312,6 +372,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       if (mode !== 'draw' || !currentPath?.path) return;
       setPaths(prevPaths => [...prevPaths, currentPath.path]);
       setCurrentPath(null);
+      console.log(`✅ Path completed. Total user commands captured: ${userCommands.length}`);
     };
 
     const panGesture = Gesture.Pan()

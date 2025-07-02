@@ -4,3 +4,4 @@ export { testCoordinates } from './drawingCommands';
 export { proceedWithAPICall } from './proceedWithAPICall';
 export { testCreativeDrawing } from './drawingCommands'; 
 export { analyzeThenDraw } from './proceedWithAPICall';
+export { analyzeThenDrawWithContext } from './proceedWithAPICall';

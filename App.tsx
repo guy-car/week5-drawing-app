@@ -3,7 +3,8 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
-import { analyzeThenDraw } from './src/api/openai';
+import { analyzeThenDraw, analyzeThenDrawWithContext } from './src/api/openai';
+import { DrawingCommand } from './src/api/openai/types';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -14,6 +15,7 @@ interface DrawingCanvasRef {
   clear: () => void;
   handleZoom: (increment: boolean) => void;
   exportCanvas: () => Promise<string | null>;
+  exportCanvasWithCommands: () => Promise<{ image: string | null; commands: DrawingCommand[] }>;
   addAIPath: (commands: any[]) => void;
   addDebugGrid: () => void;
 }
@@ -47,21 +49,32 @@ export default function App() {
     }
 
     setIsTestingAI(true);
-    console.log('🔍 Starting two-step AI analysis...');
+    console.log('🔍 Starting context-aware two-step AI analysis...');
 
     try {
-      const base64Image = await canvasRef.current.exportCanvas();
-      if (!base64Image) throw new Error('Failed to export canvas');
+      // Use the new exportCanvasWithCommands function to get both image and commands
+      const canvasData = await canvasRef.current.exportCanvasWithCommands();
+      if (!canvasData.image) throw new Error('Failed to export canvas');
 
-      const commands = await analyzeThenDraw(base64Image);
-      console.log('✅ Successfully parsed AI commands:', commands);
+      console.log(`📊 Sending ${canvasData.commands.length} user commands as context to AI`);
+      console.log('🎯 First few commands:', canvasData.commands.slice(0, 3));
+
+      // Use the new context-aware function that takes both image and existing commands
+      const commands = await analyzeThenDrawWithContext(canvasData.image, canvasData.commands);
+      console.log('✅ Successfully parsed context-aware AI commands:', commands);
 
       // Use our addAIPath method to render the commands
       canvasRef.current.addAIPath(commands);
 
-      Alert.alert('AI Test Success!', `✅ Canvas exported and AI commands rendered!\n\nAI added ${commands.length} drawing commands.\n\nCheck console for full response.`, [{ text: 'OK' }]);
+      Alert.alert('🎨 Context-Aware AI Success!', 
+        `✅ Canvas exported and context-aware AI commands rendered!\n\n` +
+        `📊 Context: ${canvasData.commands.length} user commands\n` +
+        `🤖 AI added: ${commands.length} new commands\n\n` +
+        `Check console for full analysis.`, 
+        [{ text: 'OK' }]
+      );
     } catch (error) {
-      console.error('❌ AI Integration Test Failed:', error);
+      console.error('❌ Context-Aware AI Integration Test Failed:', error);
       Alert.alert('AI Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
     } finally {
       setIsTestingAI(false);
