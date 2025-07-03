@@ -7,6 +7,7 @@ import { analyzeThenDraw, analyzeThenDrawWithContext } from './src/api/openai';
 import { riffOnSketch, testStreamingParser } from './src/api/openai/riffOnSketch';
 import { DrawingCommand } from './src/api/openai/types';
 import { vectorSummary } from './src/utils/vectorSummary';
+import { streamLog } from './src/api/openai/config';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -52,7 +53,7 @@ export default function App() {
     }
 
     setIsTestingAI(true);
-    console.log('🔍 Starting AI analysis...');
+    streamLog.info('🎨 Starting AI analysis...');
 
     try {
       const canvasData = await canvasRef.current.exportCanvasWithCommands();
@@ -61,7 +62,7 @@ export default function App() {
       let commands: DrawingCommand[];
       
       if (process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1') {
-        console.log('🎨 Using riff-on-sketch mode');
+        streamLog.info('🎨 Using riff-on-sketch mode');
         const summary = vectorSummary(canvasData.commands);
         commands = await riffOnSketch({ 
           image: canvasData.image!,
@@ -69,31 +70,15 @@ export default function App() {
           onIncrementalDraw: canvasRef.current.addAICommandIncremental
         });
       } else {
-        console.log('📊 Using standard mode with context');
-        console.log(`📊 Sending ${canvasData.commands.length} user commands as context to AI`);
-        console.log('🎯 First few commands:', canvasData.commands.slice(0, 3));
+        streamLog.info('📊 Using standard mode');
         commands = await analyzeThenDrawWithContext(canvasData.image, canvasData.commands);
       }
 
-      console.log('✅ Successfully parsed AI commands:', commands);
-
-      // Use our addAIPath method to render the commands
       canvasRef.current.addAIPath(commands);
-
-      Alert.alert('🎨 AI Success!', 
-        `✅ Canvas exported and AI commands rendered!\n\n` +
-        `📊 Context: ${canvasData.commands.length} user commands\n` +
-        `🤖 AI added: ${commands.length} new commands\n\n` +
-        `Check console for full analysis.`, 
-        [{ text: 'OK' }]
-      );
     } catch (error: unknown) {
-      console.error('❌ AI Integration Test Failed:', error);
-      Alert.alert(
-        'AI Test Failed', 
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        [{ text: 'OK' }]
-      );
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      streamLog.warn('❌ Error during AI analysis:', errorMessage);
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsTestingAI(false);
     }

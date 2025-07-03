@@ -1,3 +1,5 @@
+import { streamLog } from './config';
+
 /**
  * Creates a streaming JSON parser that processes chunks of text and extracts complete JSON objects.
  * Handles OpenAI streaming responses where JSON objects may be split across multiple chunks.
@@ -13,39 +15,36 @@ export const streamParser = (callback: (obj: any) => void) => {
 
   return (chunk: string) => {
     buffer += chunk;
-    console.log('🔄 Parser received chunk:', JSON.stringify(chunk));
+    streamLog.debug('🔄 Parser received chunk:', JSON.stringify(chunk));
     
     // First, check if we've found the commands array start
     if (!foundCommandsArray && buffer.includes('"commands":[')) {
-      console.log('📍 Found commands array in buffer');
+      streamLog.debug('📍 Found commands array in buffer');
       foundCommandsArray = true;
       // Trim everything before the commands array
       const commandsStart = buffer.indexOf('"commands":[') + '"commands":['.length;
       buffer = buffer.slice(commandsStart);
-      console.log('🔧 Buffer trimmed to start from commands array:', JSON.stringify(buffer.slice(0, 100)) + '...');
+      streamLog.debug('🔧 Buffer trimmed to start from commands array');
     }
     
     if (!foundCommandsArray) {
-      console.log('⏳ Still waiting for commands array...');
+      streamLog.debug('⏳ Still waiting for commands array...');
       return;
     }
     
     // Now look for complete command objects
-    // Pattern: {"type":"...","x":...,"y":...} or similar
     let searchStart = 0;
     let objectsFoundInThisChunk = 0;
     
-    console.log(`🔍 Starting search in buffer (length: ${buffer.length}, searchStart: ${searchStart})`);
+    streamLog.debug(`🔍 Starting search in buffer (length: ${buffer.length})`);
     
     while (true) {
       // Find the start of a potential command object
       const objectStart = buffer.indexOf('{', searchStart);
       if (objectStart === -1) {
-        console.log('🔍 No more opening braces found in buffer');
+        streamLog.debug('🔍 No more opening braces found in buffer');
         break;
       }
-      
-      console.log(`🎯 Found opening brace at position ${objectStart} (relative to searchStart: ${objectStart - searchStart})`);
       
       // Find the matching closing brace
       let braceDepth = 0;
@@ -79,7 +78,6 @@ export const streamParser = (callback: (obj: any) => void) => {
             braceDepth--;
             if (braceDepth === 0) {
               objectEnd = i;
-              console.log(`✅ Found matching closing brace at position ${objectEnd} (depth returned to 0)`);
               break;
             }
           }
@@ -87,18 +85,17 @@ export const streamParser = (callback: (obj: any) => void) => {
       }
       
       if (objectEnd === -1) {
-        console.log('🔍 Incomplete object found, waiting for more data...');
+        streamLog.debug('🔍 Incomplete object found, waiting for more data...');
         break;
       }
       
       // Extract the complete object
       const objectJson = buffer.slice(objectStart, objectEnd + 1);
-      console.log('🎯 Complete object found:', objectJson);
       
       // Check for duplicates
-      const objectHash = JSON.stringify(objectJson); // Simple hash for duplicate detection
+      const objectHash = JSON.stringify(objectJson);
       if (processedCommands.has(objectHash)) {
-        console.log('🚫 DUPLICATE DETECTED - skipping object:', objectJson);
+        streamLog.debug('🚫 Skipping duplicate command');
         searchStart = objectEnd + 1;
         continue;
       }
@@ -111,31 +108,24 @@ export const streamParser = (callback: (obj: any) => void) => {
           totalCommandsEmitted++;
           objectsFoundInThisChunk++;
           
-          console.log(`✅ Successfully parsed command #${totalCommandsEmitted}:`, JSON.stringify(parsed));
-          console.log('🚀 Sending command to callback:', parsed);
+          streamLog.debug(`✅ Parsed command #${totalCommandsEmitted}`);
           callback(parsed);
-        } else {
-          console.log('⚠️ Object is not a drawing command:', parsed);
         }
       } catch (error) {
-        console.warn('❌ Failed to parse object JSON:', objectJson, error);
+        streamLog.warn('❌ Failed to parse object JSON:', error);
       }
       
       // Move search start past this object
-      const newSearchStart = objectEnd + 1;
-      console.log(`➡️ Moving searchStart from ${searchStart} to ${newSearchStart}`);
-      searchStart = newSearchStart;
+      searchStart = objectEnd + 1;
       
       // Remove processed part from buffer to prevent memory buildup
-      if (searchStart > 1000) { // Only trim if buffer is getting large
-        const trimmedLength = searchStart;
+      if (searchStart > 1000) {
         buffer = buffer.slice(searchStart);
         searchStart = 0;
-        console.log(`🧹 Buffer trimmed by ${trimmedLength} characters to prevent memory buildup`);
+        streamLog.debug('🧹 Buffer trimmed to prevent memory buildup');
       }
     }
-    
-    console.log(`📊 Chunk summary - objectsFound: ${objectsFoundInThisChunk}, totalEmitted: ${totalCommandsEmitted}, duplicatesTracked: ${processedCommands.size}, bufferLength: ${buffer.length}`);
+  
   };
 };
 
@@ -151,14 +141,19 @@ export const openAIStreamParser = (
   onChunk: (obj: any) => void, 
   onComplete?: () => void
 ) => {
-  // Create a JSON parser that will accumulate chunks until it finds complete objects
   const jsonParser = streamParser((obj) => {
-    console.log('🎨 openAIStreamParser received command from streamParser:', JSON.stringify(obj));
+    streamLog.debug('🎨 Received command from streamParser');
     onChunk(obj);
   });
 
   return (chunk: string) => {
-    console.log('📡 openAIStreamParser received chunk:', JSON.stringify(chunk));
+    if (chunk.includes('[DONE]')) {
+      streamLog.info('✨ SSE stream finished with [DONE]');
+      onComplete?.();
+      return;
+    }
+    
+    streamLog.debug('📡 Received SSE chunk');
     jsonParser(chunk);
   };
 }; 

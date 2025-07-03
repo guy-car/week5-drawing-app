@@ -12,6 +12,7 @@ import { DrawingCommand } from '../src/api/openai/types';
 import { exportCanvas } from '../src/utils/canvasExport';
 import { BASE_CANVAS_SIZE } from '../src/constants/canvas';
 import { buildPathFromCommands } from './pathBuilder';
+import { streamLog } from '../src/api/openai/config';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
@@ -124,7 +125,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     };
 
     const addDebugGrid = () => {
-      console.log('🔧 Adding debug grid to visualize coordinate system');
+      streamLog.debug('🔧 Adding debug grid');
       const gridPath = Skia.Path.Make();
       
       // Add grid lines every 100 pixels with labels
@@ -138,25 +139,20 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       }
       
       setPaths(prevPaths => [...prevPaths, gridPath]);
-      console.log('✅ Debug grid added - shows 100px intervals on 1000x1000 canvas');
     };
 
     const addAICommandIncremental = (command: DrawingCommand) => {
       try {
-        console.log('📍 Processing incremental AI command:', command);
+        streamLog.debug('📍 Processing AI command:', command.type);
         
         if (!aiPathRef.current) {
-          console.log('🎨 Creating new AI path');
           aiPathRef.current = Skia.Path.Make();
         }
         
         buildPathFromCommands([command], aiPathRef.current);
-        
-        // Update paths array to trigger re-render, filtering out previous aiPath if it exists
         setPaths(prev => [...prev.filter(p => p !== aiPathRef.current), aiPathRef.current]);
-        console.log('✅ Incremental AI command processed successfully');
       } catch (error) {
-        console.error('❌ Error processing incremental AI command:', error);
+        streamLog.warn('❌ Error processing AI command:', error);
       }
     };
 
@@ -166,7 +162,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         setCurrentPath(null);
         setUserCommands([]);
         aiPathRef.current = null;
-        console.log('🧹 Cleared canvas, user commands, and AI path');
       },
       handleZoom,
       exportCanvas: () => exportCanvas(canvasRef, { resize: 256, format: 'jpeg', quality: 0.6 }),
@@ -218,8 +213,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         };
         
         setUserCommands(prevCommands => [...prevCommands, moveToCommand]);
-        console.log('📝 Captured moveTo command:', moveToCommand);
-        console.log(`📊 Total user commands captured: ${userCommands.length + 1}`);
       }
     };
 
@@ -261,8 +254,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         };
         
         setUserCommands(prevCommands => [...prevCommands, lineToCommand]);
-        console.log('📝 Captured lineTo command:', lineToCommand);
-        console.log(`📊 Total user commands captured: ${userCommands.length + 1}`);
       }
     };
 
@@ -270,7 +261,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       if (mode !== 'draw' || !currentPath?.path) return;
       setPaths(prevPaths => [...prevPaths, currentPath.path]);
       setCurrentPath(null);
-      console.log(`✅ Path completed. Total user commands captured: ${userCommands.length}`);
     };
 
     const panGesture = Gesture.Pan()
