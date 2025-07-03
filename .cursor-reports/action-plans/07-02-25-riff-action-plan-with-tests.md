@@ -250,57 +250,97 @@ With this scaffold, `npm test` can run anywhere (CI or local).
     };
   };
   ```
-* **🔎 Jest** edge-case tests: nested braces inside strings, multiple objects in one chunk.
 
-### **Stage 7 – Enable streaming**
-* **🛠** Modify `riffOnSketch`:
-  1. `stream:true` in body.
-  2. After `const res = await fetch...`, check `if(!res.body){ /*retry*/ }`.
-  3. `for await (const chunk of res.body as any) parser(chunk.toString('utf8'));`
-  4. In parser callback dispatch only objects with `type` field to `addAICommandIncremental`.
-* **🔎 Manual timing**: open dev menu → Performance Monitor; log `stamp` labels and confirm `< 3 s`.
-
-#### **IMPORTANT UPDATE - OpenAI Streaming Format**
-* **❗ Key Discovery**: OpenAI doesn't stream complete drawing commands. Instead, it streams JSON character by character:
-  ```json
-  {"choices":[{"delta":{"content":"{"}}]}
-  {"choices":[{"delta":{"content":"\"commands\""}}]}
-  {"choices":[{"delta":{"content":"\":["}}]}
-  {"choices":[{"delta":{"content":"{\"type\":\"move"}}]}
+* **🛠 Logging System** in `src/api/openai/config.ts`:
+  ```ts
+  export const DEBUG_STREAM = process.env.DEBUG_STREAM === '1';
+  
+  export const streamLog = {
+    debug: (...args: any[]) => {
+      if (DEBUG_STREAM) console.log(...args);
+    },
+    info: (...args: any[]) => console.log(...args),
+    warn: (...args: any[]) => console.warn(...args)
+  };
   ```
 
-* **✅ Solution**: Use our existing `streamParser` from Stage 6:
-  1. Extract `content` from each OpenAI chunk:
-     ```typescript
+* **🔎 Jest Tests**
+  ```ts
+  // Mock streamLog
+  jest.mock('../src/api/openai/config', () => ({
+    streamLog: {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn()
+    }
+  }));
+
+  // Test edge cases
+  test('handles nested braces in strings', () => {/*...*/});
+  test('handles multiple objects in chunk', () => {/*...*/});
+  ```
+
+### **Stage 7 – Enable streaming with Improved Logging**
+* **🛠 Modify `riffOnSketch`**:
+  1. Set `stream:true` in body
+  2. Implement SSE handling:
+     ```ts
+     const parser = openAIStreamParser(
+       (command) => {
+         if (firstCommand) {
+           stamp('first-stroke');
+           firstCommand = false;
+         }
+         receivedCommands.push(command);
+         onIncrementalDraw?.(command);
+       },
+       () => streamLog.info('✨ Stream complete')
+     );
+     ```
+  3. Handle OpenAI chunks:
+     ```ts
      if (parsed.choices?.[0]?.delta?.content) {
-         const chunk = parsed.choices[0].delta.content;
-         jsonParser(chunk);  // Our parser handles accumulation!
+       const chunk = parsed.choices[0].delta.content;
+       parser(chunk);
      }
      ```
-  2. The parser will:
-     - Accumulate chunks in its buffer
-     - Track JSON nesting depth
-     - Fire callback when it finds complete objects
-     - Perfect for real-time drawing!
 
-* **🎯 Expected Timeline**:
-  1. SSE connects → `first-byte` stamp
-  2. Content chunks arrive and accumulate
-  3. First complete command parsed (~1-2s) → `first-stroke` stamp
-  4. Subsequent commands parsed and drawn in real-time
-  5. Stream ends with `finish_reason: "stop"`
+* **🎯 Logging Output**
+  With DEBUG_STREAM=0:
+  ```
+  🎨 Starting AI analysis...
+  🎨 Using riff-on-sketch mode
+  ✨ Stream finished with X total commands
+  ```
 
-* **📝 Implementation Notes**:
-  - Use `react-native-sse` for POST body support
-  - Feed only content chunks to parser (not OpenAI metadata)
-  - Keep performance stamps for latency verification
-  - No need to wait for stream completion to start drawing
+  With DEBUG_STREAM=1:
+  ```
+  🎨 Starting AI analysis...
+  🎨 Using riff-on-sketch mode
+  🔄 Parser received chunk: {...}
+  📍 Processing AI command: moveTo
+  ✨ Stream finished with X total commands
+  ```
 
-### **Stage 8 – Performance timestamps**
-* **🛠** In `DrawingCanvas` exportCanvasWithCommands path: `stamp('img-ready')`.
-* **🛠** In `riffOnSketch` before first SSE chunk: `stamp('first-chunk')`.
-* **🛠** In `addAICommandIncremental` first call set flag & `stamp('first-stroke')`.
-* **🔎** Analyse timeline in RN profiler.
+* **🔎 Manual timing**: Verify `< 3 s` using Performance Monitor
+
+### **Stage 8 – Performance Monitoring**
+* **🛠 Performance Stamps**
+  - `stamp('img-ready')` - After canvas export
+  - `stamp('first-byte')` - Before SSE connection
+  - `stamp('first-stroke')` - On first command
+  - `stamp('done')` - On stream completion
+
+* **🛠 Debug Logging**
+  - Keep performance-critical logs at info level
+  - Move detailed processing logs to debug level
+  - Track command counts and stream status
+
+* **🔎 Verification**
+  1. Set DEBUG_STREAM=1
+  2. Check Performance Monitor
+  3. Verify stamps appear in correct order
+  4. Confirm < 3s latency target
 
 ### **Stage 9 – Schema & prompt extraction**
 * **🛠** Extend zod union:
@@ -334,5 +374,9 @@ All tests green + manual smoke ≙ safe merge 🚀
 1. Running `npm test` passes on CI & local.
 2. Manual smoke: centred canvas, blue background, drawing works.
 3. AI riff delivers first animated stroke **< 3 s** after tap on physical device.
+4. Logging system properly categorizes messages:
+   - Debug logs only appear with DEBUG_STREAM=1
+   - Essential info always visible
+   - Performance stamps tracked correctly
 
 Follow the stages and you will integrate the new AI assist without breaking existing functionality. 

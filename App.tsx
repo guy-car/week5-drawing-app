@@ -8,6 +8,7 @@ import { riffOnSketch, testStreamingParser } from './src/api/openai/riffOnSketch
 import { DrawingCommand } from './src/api/openai/types';
 import { vectorSummary } from './src/utils/vectorSummary';
 import { streamLog } from './src/api/openai/config';
+import { stamp, printPerf } from './src/utils/performance';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -61,6 +62,8 @@ export default function App() {
 
       let commands: DrawingCommand[];
       
+      stamp('upload-start');
+
       if (process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1') {
         streamLog.info('🎨 Using riff-on-sketch mode');
         const summary = vectorSummary(canvasData.commands);
@@ -75,6 +78,9 @@ export default function App() {
       }
 
       canvasRef.current.addAIPath(commands);
+
+      stamp('done');
+      printPerf();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       streamLog.warn('❌ Error during AI analysis:', errorMessage);
