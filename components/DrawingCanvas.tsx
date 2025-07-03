@@ -34,6 +34,10 @@ interface DrawingCanvasRef {
   addAIPath: (commands: DrawingCommand[]) => void;
   addDebugGrid: () => void;
   addAICommandIncremental: (command: DrawingCommand) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 interface PathWithData {
@@ -43,11 +47,21 @@ interface PathWithData {
   points: [number, number][];
 }
 
+// ----- Undo/Redo -----
+interface Stroke {
+  path: any;                        // Skia.Path
+  commands: DrawingCommand[];       // for export
+}
+
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
   ({ mode, onZoomChange, screenWidth, screenHeight }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
+    const [strokes, setStrokes] = useState<Stroke[]>([]);
+    const undoStack = useRef<Stroke[]>([]);
+    const redoStack = useRef<Stroke[]>([]);
+    const MAX_HISTORY = 15;
     const canvasRef = useCanvasRef();
     const aiPathRef = useRef<any>(null);
     
@@ -123,7 +137,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       try {
         console.log('🎯 AI Commands received:', commands);
         const aiPath = buildPathFromCommands(commands);
-        setPaths(prevPaths => [...prevPaths, aiPath]);
+        const stroke: Stroke = { path: aiPath, commands };
+
+        setStrokes(prev => [...prev, stroke]);
+        setPaths(prev => [...prev, aiPath]);
+
+        undoStack.current.push(stroke);
+        redoStack.current = [];
+        if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+
         console.log(`✅ AI path added successfully with ${commands.length} commands`);
       } catch (error) {
         console.error('❌ Error adding AI path:', error);
@@ -162,11 +184,33 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       }
     };
 
+    const canUndo = () => undoStack.current.length > 0;
+    const canRedo = () => redoStack.current.length > 0;
+
+    const undo = () => {
+      if (!canUndo()) return;
+      const last = undoStack.current.pop()!;
+      redoStack.current.push(last);
+      setStrokes(prev => prev.slice(0, -1));
+      setPaths(prev => prev.slice(0, -1));
+    };
+
+    const redo = () => {
+      if (!canRedo()) return;
+      const stroke = redoStack.current.pop()!;
+      undoStack.current.push(stroke);
+      setStrokes(prev => [...prev, stroke]);
+      setPaths(prev => [...prev, stroke.path]);
+    };
+
     useImperativeHandle(ref, () => ({
       clear: () => {
         setPaths([]);
+        setStrokes([]);
         setCurrentPath(null);
         setUserCommands([]);
+        undoStack.current = [];
+        redoStack.current = [];
         aiPathRef.current = null;
       },
       handleZoom,
@@ -175,6 +219,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       addAIPath,
       addDebugGrid,
       addAICommandIncremental,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
     }));
 
     const animatedStyle = useAnimatedStyle(() => {
@@ -265,8 +313,22 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const onTouchEnd = () => {
       if (mode !== 'draw' || !currentPath?.path) return;
-      setPaths(prevPaths => [...prevPaths, currentPath.path]);
+
+      // 1. Create stroke object
+      const stroke: Stroke = {
+        path: currentPath.path,
+        commands: [...userCommands.slice(-currentPath.points.length)] // last cmds for this stroke
+      };
+
+      // 2. Render it
+      setStrokes(prev => [...prev, stroke]);
+      setPaths(prev => [...prev, currentPath.path]); // existing render list
       setCurrentPath(null);
+
+      // 3. History bookkeeping
+      undoStack.current.push(stroke);
+      redoStack.current = [];
+      if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
     };
 
     const panGesture = Gesture.Pan()
