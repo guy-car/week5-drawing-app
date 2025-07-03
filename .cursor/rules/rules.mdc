@@ -10,3 +10,5 @@ Ai model:
 use 'gpt-4o' model since 'gpt-4-vision-preview' is deprecated
 
 I love questions, if you have any doubts or need clarification about anything, please ask me questions. I absolutely love that.
+
+Reference [NOTES.MD](mdc:NOTES.MD) before changing any code changes
