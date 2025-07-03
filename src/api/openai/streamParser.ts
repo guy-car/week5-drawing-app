@@ -7,59 +7,135 @@
  */
 export const streamParser = (callback: (obj: any) => void) => {
   let buffer = '';
+  let foundCommandsArray = false;
+  let processedCommands = new Set<string>(); // Track processed commands to avoid duplicates
+  let totalCommandsEmitted = 0;
 
   return (chunk: string) => {
     buffer += chunk;
+    console.log('🔄 Parser received chunk:', JSON.stringify(chunk));
     
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let startIndex = 0;
+    // First, check if we've found the commands array start
+    if (!foundCommandsArray && buffer.includes('"commands":[')) {
+      console.log('📍 Found commands array in buffer');
+      foundCommandsArray = true;
+      // Trim everything before the commands array
+      const commandsStart = buffer.indexOf('"commands":[') + '"commands":['.length;
+      buffer = buffer.slice(commandsStart);
+      console.log('🔧 Buffer trimmed to start from commands array:', JSON.stringify(buffer.slice(0, 100)) + '...');
+    }
     
-    for (let i = 0; i < buffer.length; i++) {
-      const char = buffer[i];
-      
-      // Handle string state to ignore braces inside strings
-      if (char === '"' && !escaped) {
-        inString = !inString;
+    if (!foundCommandsArray) {
+      console.log('⏳ Still waiting for commands array...');
+      return;
+    }
+    
+    // Now look for complete command objects
+    // Pattern: {"type":"...","x":...,"y":...} or similar
+    let searchStart = 0;
+    let objectsFoundInThisChunk = 0;
+    
+    console.log(`🔍 Starting search in buffer (length: ${buffer.length}, searchStart: ${searchStart})`);
+    
+    while (true) {
+      // Find the start of a potential command object
+      const objectStart = buffer.indexOf('{', searchStart);
+      if (objectStart === -1) {
+        console.log('🔍 No more opening braces found in buffer');
+        break;
       }
       
-      // Handle escape sequences
-      escaped = char === '\\' && !escaped;
+      console.log(`🎯 Found opening brace at position ${objectStart} (relative to searchStart: ${objectStart - searchStart})`);
       
-      // Only count braces when not inside strings
-      if (!inString) {
-        if (char === '{') {
-          // If this is the first opening brace, mark the start
-          if (depth === 0) {
-            startIndex = i;
-          }
-          depth++;
-        } else if (char === '}') {
-          depth--;
-          
-          // When depth reaches 0, we have a complete JSON object
-          if (depth === 0) {
-            const json = buffer.slice(startIndex, i + 1);
-            try {
-              const parsed = JSON.parse(json);
-              callback(parsed);
-            } catch (error) {
-              console.warn('Failed to parse JSON chunk:', json, error);
+      // Find the matching closing brace
+      let braceDepth = 0;
+      let inString = false;
+      let escaped = false;
+      let objectEnd = -1;
+      
+      for (let i = objectStart; i < buffer.length; i++) {
+        const char = buffer[i];
+        
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        
+        // Only process structural characters when not in a string
+        if (!inString) {
+          if (char === '{') {
+            braceDepth++;
+          } else if (char === '}') {
+            braceDepth--;
+            if (braceDepth === 0) {
+              objectEnd = i;
+              console.log(`✅ Found matching closing brace at position ${objectEnd} (depth returned to 0)`);
+              break;
             }
           }
         }
       }
+      
+      if (objectEnd === -1) {
+        console.log('🔍 Incomplete object found, waiting for more data...');
+        break;
+      }
+      
+      // Extract the complete object
+      const objectJson = buffer.slice(objectStart, objectEnd + 1);
+      console.log('🎯 Complete object found:', objectJson);
+      
+      // Check for duplicates
+      const objectHash = JSON.stringify(objectJson); // Simple hash for duplicate detection
+      if (processedCommands.has(objectHash)) {
+        console.log('🚫 DUPLICATE DETECTED - skipping object:', objectJson);
+        searchStart = objectEnd + 1;
+        continue;
+      }
+      
+      try {
+        const parsed = JSON.parse(objectJson);
+        if (parsed && typeof parsed === 'object' && 'type' in parsed) {
+          // Mark as processed
+          processedCommands.add(objectHash);
+          totalCommandsEmitted++;
+          objectsFoundInThisChunk++;
+          
+          console.log(`✅ Successfully parsed command #${totalCommandsEmitted}:`, JSON.stringify(parsed));
+          console.log('🚀 Sending command to callback:', parsed);
+          callback(parsed);
+        } else {
+          console.log('⚠️ Object is not a drawing command:', parsed);
+        }
+      } catch (error) {
+        console.warn('❌ Failed to parse object JSON:', objectJson, error);
+      }
+      
+      // Move search start past this object
+      const newSearchStart = objectEnd + 1;
+      console.log(`➡️ Moving searchStart from ${searchStart} to ${newSearchStart}`);
+      searchStart = newSearchStart;
+      
+      // Remove processed part from buffer to prevent memory buildup
+      if (searchStart > 1000) { // Only trim if buffer is getting large
+        const trimmedLength = searchStart;
+        buffer = buffer.slice(searchStart);
+        searchStart = 0;
+        console.log(`🧹 Buffer trimmed by ${trimmedLength} characters to prevent memory buildup`);
+      }
     }
     
-    // Clean up the buffer - keep only the incomplete part
-    if (depth === 0) {
-      // No incomplete JSON, clear the buffer
-      buffer = '';
-    } else {
-      // Keep the incomplete JSON starting from startIndex
-      buffer = buffer.slice(startIndex);
-    }
+    console.log(`📊 Chunk summary - objectsFound: ${objectsFoundInThisChunk}, totalEmitted: ${totalCommandsEmitted}, duplicatesTracked: ${processedCommands.size}, bufferLength: ${buffer.length}`);
   };
 };
 
@@ -67,7 +143,7 @@ export const streamParser = (callback: (obj: any) => void) => {
  * Creates a parser for OpenAI Server-Sent Events (SSE) streaming format.
  * Handles the specific format: "data: {json}\n\ndata: [DONE]"
  * 
- * @param onChunk Callback for each JSON object with 'type' field
+ * @param onChunk Callback for each drawing command object
  * @param onComplete Optional callback when stream ends with [DONE]
  * @returns Function that accepts SSE chunks
  */
@@ -75,48 +151,14 @@ export const openAIStreamParser = (
   onChunk: (obj: any) => void, 
   onComplete?: () => void
 ) => {
-  let sseBuffer = '';
+  // Create a JSON parser that will accumulate chunks until it finds complete objects
   const jsonParser = streamParser((obj) => {
-    // Only dispatch objects with a 'type' field (drawing commands)
-    if (obj && typeof obj === 'object' && 'type' in obj) {
-      onChunk(obj);
-    }
+    console.log('🎨 openAIStreamParser received command from streamParser:', JSON.stringify(obj));
+    onChunk(obj);
   });
 
   return (chunk: string) => {
-    sseBuffer += chunk;
-    
-    // Process complete SSE events (ending with \n\n)
-    const events = sseBuffer.split('\n\n');
-    // Keep the last incomplete event in the buffer
-    sseBuffer = events.pop() || '';
-    
-    for (const event of events) {
-      const lines = event.split('\n');
-      
-      for (const line of lines) {
-        const trimmed = line.trim();
-        
-        if (trimmed.startsWith('data: ')) {
-          const data = trimmed.slice(6); // Remove 'data: ' prefix
-          
-          if (data === '[DONE]') {
-            onComplete?.();
-            return;
-          }
-          
-          // Try to parse the JSON directly first
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed && typeof parsed === 'object' && 'type' in parsed) {
-              onChunk(parsed);
-            }
-          } catch {
-            // If direct parsing fails, use the streaming parser for partial JSON
-            jsonParser(data);
-          }
-        }
-      }
-    }
+    console.log('📡 openAIStreamParser received chunk:', JSON.stringify(chunk));
+    jsonParser(chunk);
   };
 }; 

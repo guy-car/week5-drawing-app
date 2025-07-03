@@ -103,12 +103,18 @@ RULES:
 
         const parser = openAIStreamParser(
           (command) => {
+            console.log('🎯 riffOnSketch received individual command from parser:', JSON.stringify(command));
             if (firstCommand) {
               stamp('first-stroke');
               firstCommand = false;
+              console.log('⏱️ First command received - performance stamp logged');
             }
             receivedCommands.push(command);
+            console.log('📦 Command added to receivedCommands array. Total commands so far:', receivedCommands.length);
+            
+            console.log('🖼️ About to call onIncrementalDraw with command:', JSON.stringify(command));
             onIncrementalDraw?.(command);
+            console.log('✅ onIncrementalDraw callback completed for command:', command.type);
           },
           () => console.log('✅ SSE stream complete')
         );
@@ -125,7 +131,6 @@ RULES:
 
         es.addEventListener('message', (event: any) => {
           const data: string = event.data;
-          console.log('🔍 SSE received raw data:', JSON.stringify(data));
           
           if (data === '[DONE]') {
             console.log('🏁 SSE stream finished with [DONE]');
@@ -134,19 +139,18 @@ RULES:
             return;
           }
           
-          // Try to parse as OpenAI streaming format
+          // Parse the OpenAI streaming format and extract content
           try {
             const parsed = JSON.parse(data);
-            console.log('🔍 SSE parsed object:', JSON.stringify(parsed));
-            if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
-              console.log('🔍 SSE content chunk:', JSON.stringify(parsed.choices[0].delta.content));
+            if (parsed.choices?.[0]?.delta?.content) {
+              const contentChunk = parsed.choices[0].delta.content;
+              console.log('🔍 Content chunk:', contentChunk);
+              // Feed only the content chunk to our JSON parser
+              parser(contentChunk);
             }
           } catch (e) {
-            console.log('🔍 SSE not JSON, raw data:', data);
+            console.warn('Failed to parse SSE data:', e);
           }
-          
-          // For now, still try the old parser to see what happens
-          parser(data);
         });
 
         es.addEventListener('error', (event: any) => {
