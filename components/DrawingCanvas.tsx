@@ -38,6 +38,7 @@ interface DrawingCanvasRef {
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+  isEmpty: () => boolean;
 }
 
 interface PathWithData {
@@ -223,6 +224,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       redo,
       canUndo,
       canRedo,
+      isEmpty: () => paths.length === 0,
     }));
 
     const animatedStyle = useAnimatedStyle(() => {

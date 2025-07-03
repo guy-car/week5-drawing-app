@@ -7,9 +7,15 @@ Deliver a polished demo-ready drawing experience in the next 14 h that feels res
 
 ## Actions to take
 
-1. **Undo / Redo stack**  
-   • File(s): `components/DrawingCanvas.tsx`, possibly `App.tsx` (buttons)  
-   • Keep an array of path snapshots; add `undo()` / `redo()` methods and buttons in the header.
+0. clean up:
+-  info screen after AI responded
+- 
+
+1. ✅ **Undo / Redo stack** (COMPLETED)  
+   • Implementation: Two-stack approach with `undoStack` and `redoStack` for O(1) operations
+   • Stores last 15 strokes (both user & AI) with their paths and commands
+   • UI: Added undo/redo buttons next to AI controls
+   • Files changed: `components/DrawingCanvas.tsx`, `App.tsx`
 
 2. **Clear-all with confirmation**  
    • File(s): `App.tsx`  
@@ -55,16 +61,15 @@ Deliver a polished demo-ready drawing experience in the next 14 h that feels res
 
 ---
 
-### Suggested order (elapsed estimate)
-1. Undo/Redo (0.7 h)  
-2. Clear-all confirm (0.2 h)  
-3. Colour picker + eraser (1 h)  
-4. Rect canvas (0.4 h)  
-5. Brush slider (0.6 h)  
-6. Bottom sheet polish (1 h)  
-7. Save/share (0.6 h)  
-8. Prompt slimming (0.8 h)  
-9. Early spinner dismiss (0.2 h)  
-10. Docs (0.3 h)
+### Suggested order (remaining estimate)
+1. Clear-all confirm (0.2 h)  
+2. Colour picker + eraser (1 h)  
+3. Rect canvas (0.4 h)  
+4. Brush slider (0.6 h)  
+5. Bottom sheet polish (1 h)  
+6. Save/share (0.6 h)  
+7. Prompt slimming (0.8 h)  
+8. Early spinner dismiss (0.2 h)  
+9. Docs (0.3 h)
 
-Total ≈ 5.8 h – leaves buffer for testing & demo recording. 
+Total ≈ 5.1 h – leaves buffer for testing & demo recording. 
