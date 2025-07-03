@@ -62,7 +62,7 @@ Focus on the dominant angles (${summary.dominantAngles.join(', ')}°) and work w
 
 RULES:
 - Start each new shape with moveTo (except circles)
-- Generate 10-50 commands total
+- Generate 10-30 commands total
 - All coordinates must be between 0-1000
 - Circle radius must be between 1-500
 - Use similar segment lengths (around ${Math.round(summary.avgSegment)} units)
@@ -90,7 +90,9 @@ RULES:
     // --- STREAMING PATH ----------------------------------------------
     if (useStreaming) {
       return await new Promise<DrawingCommand[]>((resolve, reject) => {
-        stamp('first-byte');
+        // The EventSource is created after the HTTP request completes and
+        // the server switches to SSE – that marks the end of the upload.
+        stamp('upload-done');
 
         const receivedCommands: DrawingCommand[] = [];
         let firstCommand = true;
@@ -117,6 +119,8 @@ RULES:
           pollingInterval: 0,
         });
 
+        let firstChunk = true;
+
         es.addEventListener('message', (event: any) => {
           const data: string = event.data;
           
@@ -130,6 +134,11 @@ RULES:
           try {
             const parsed = JSON.parse(data);
             if (parsed.choices?.[0]?.delta?.content) {
+              if (firstChunk) {
+                stamp('first-byte');
+                firstChunk = false;
+              }
+
               const contentChunk = parsed.choices[0].delta.content;
               parser(contentChunk);
             }

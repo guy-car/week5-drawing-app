@@ -211,3 +211,41 @@ When writing tests for streaming functionality:
    - Invalid UTF-8 sequences
    - Buffer overflow scenarios
    - Network interruptions
+
+## Latency Optimisation Levers (added 2025-07-03)
+
+The first-stroke latency currently breaks down roughly as follows (device → GPT-4o):
+
+| Stage | Typical time |
+|-------|--------------|
+| Skia snapshot & JPEG encode | 80-150 ms |
+| Upload to OpenAI | <10 ms (Wi-Fi) |
+| Model queue + first token | **1.8-2.5 s** |
+| Parse + render first command | 0.3-0.5 s |
+| Remaining stream (≈20-50 cmds) | 5-12 s |
+
+Fastest wins:
+
+1. **Shrink input tokens**
+   * Compact `vectorSummary` → `{bb:[minX,minY,maxX,maxY],avg:12,ang:[0,90]}`
+   * Minify RULES paragraph (single-line, no whitespace).
+   * Remove verbose property names in JSON schema (`cmd`, `x1`, …).
+   * Each 1 k tokens saved shaves ~300-400 ms from the queue step.
+2. **Ask for fewer commands**
+   * 20-30 instead of 50 reduces stream tail by ~40 %.
+3. **JPEG size**
+   * Keep snapshot `resize=192-256` px, `quality=0.5-0.6` → under 40 kB.
+4. **Parallel work**
+   * Begin `fetch()` immediately, convert bytes→Base64 in a stream if possible.
+5. **Skip pretty-print**
+   * Send compact JSON (`JSON.stringify(obj)`) not prettified.
+6. **Early UI feedback**
+   * Hide spinner after `first-stroke`; allow drawing while stream continues.
+7. **Model choice**
+   * `gpt-4o` is already the fastest; avoid older models.
+
+Measure with `stamp()` + `printPerf()` every time you tweak latency to confirm gains.
+
+### Token budget reality check (added 2025-07-03)
+
+A quick measurement shows we currently send ~1 360 input tokens (≈5 100 text characters + one 256-px image ≈85 tokens).  Optimising vectorSummary, RULES whitespace and prop names would remove ~800 tokens, saving only ~0.25–0.3 s of model queue time.  Given first-stroke is already <3 s, this has **low ROI** compared with UI features; defer until after core UX polish.

@@ -13,6 +13,7 @@ import { exportCanvas } from '../src/utils/canvasExport';
 import { BASE_CANVAS_SIZE } from '../src/constants/canvas';
 import { buildPathFromCommands } from './pathBuilder';
 import { streamLog } from '../src/api/openai/config';
+import { stamp } from '../src/utils/performance';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
@@ -90,8 +91,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const exportCanvasWithCommands = async (): Promise<{ image: string | null; commands: DrawingCommand[] }> => {
       try {
+        // Performance: mark snapshot start / end
+        stamp('snapshot-start');
+
         // Export a lightweight 256-px JPEG snapshot to minimise upload time
         const image = await exportCanvas(canvasRef, { resize: 256, format: 'jpeg', quality: 0.6 });
+
+        stamp('img-ready');
         
         // Return both image and captured commands
         const result = {
