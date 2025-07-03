@@ -3,8 +3,8 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
-import { analyzeThenDraw, analyzeThenDrawWithContext } from './src/api/openai';
-import { riffOnSketch, testStreamingParser } from './src/api/openai/riffOnSketch';
+import { analyzeThenDrawWithContext } from './src/api/openai';
+import { riffOnSketch } from './src/api/openai/riffOnSketch';
 import { DrawingCommand } from './src/api/openai/types';
 import { vectorSummary } from './src/utils/vectorSummary';
 import { streamLog } from './src/api/openai/config';
@@ -94,17 +94,6 @@ export default function App() {
     }
   };
 
-  const testStreaming = async () => {
-    try {
-      const commands = await testStreamingParser();
-      console.log('🎉 Streaming parser works!', commands);
-      alert(`Success! Parsed ${commands.length} commands`);
-    } catch (error) {
-      console.error('❌ Streaming parser failed:', error);
-      alert(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
   const handleUndo = () => {
     if (canvasRef.current) {
       canvasRef.current.undo();
@@ -165,31 +154,30 @@ export default function App() {
         </View>
 
         <View style={styles.rightControls}>
-          <TouchableOpacity 
-            style={[styles.undoButton, !canUndo && styles.disabledButton]} 
-            onPress={handleUndo}
-            disabled={!canUndo}
-          >
-            <Text style={[styles.buttonText, !canUndo && styles.disabledButtonText]}>↩</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.redoButton, !canRedo && styles.disabledButton]} 
-            onPress={handleRedo}
-            disabled={!canRedo}
-          >
-            <Text style={[styles.buttonText, !canRedo && styles.disabledButtonText]}>↪</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
             <Text style={styles.clearButtonText}>Clear</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* AI Button */}
+      {/* AI Button and History Controls */}
       <View style={styles.aiTestContainer}>
-        <TouchableOpacity onPress={testStreaming}>
-          <Text>🧪 Test Streaming Parser</Text>
-        </TouchableOpacity>
+        <View style={styles.historyControls}>
+          <TouchableOpacity 
+            style={[styles.undoButton, !canUndo && styles.disabledButton]} 
+            onPress={handleUndo}
+            disabled={!canUndo}
+          >
+            <Text style={[styles.buttonText, !canUndo && styles.disabledButtonText]}>↩ Undo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.redoButton, !canRedo && styles.disabledButton]} 
+            onPress={handleRedo}
+            disabled={!canRedo}
+          >
+            <Text style={[styles.buttonText, !canRedo && styles.disabledButtonText]}>Redo ↪</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity 
           style={[styles.aiTestButton, isTestingAI && styles.aiTestButtonDisabled]} 
           onPress={proceedWithAPICallHandler}
@@ -199,7 +187,6 @@ export default function App() {
             {isTestingAI ? '🧪 Processing...' : '🤖 AI Draw'}
           </Text>
         </TouchableOpacity>
-
       </View>
 
       {/* Canvas */}
@@ -209,7 +196,7 @@ export default function App() {
           mode={mode}
           onZoomChange={setZoom}
           screenWidth={screenWidth}
-          screenHeight={screenHeight - 160} // Account for header + AI button
+          screenHeight={screenHeight - 160}
         />
       </View>
     </GestureHandlerRootView>
@@ -328,19 +315,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffff',
   },
+  historyControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
   undoButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#007AFF',
     marginRight: 8,
   },
   redoButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#007AFF',
-    marginRight: 8,
+    marginLeft: 8,
   },
   disabledButton: {
     backgroundColor: '#e0e0e0',
