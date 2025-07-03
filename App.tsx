@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -23,6 +23,10 @@ interface DrawingCanvasRef {
   addAIPath: (commands: any[]) => void;
   addDebugGrid: () => void;
   addAICommandIncremental: (command: DrawingCommand) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 export default function App() {
@@ -97,9 +101,35 @@ export default function App() {
       alert(`Success! Parsed ${commands.length} commands`);
     } catch (error) {
       console.error('❌ Streaming parser failed:', error);
-      alert(`Failed: ${error.message}`);
+      alert(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
+
+  const handleUndo = () => {
+    if (canvasRef.current) {
+      canvasRef.current.undo();
+    }
+  };
+
+  const handleRedo = () => {
+    if (canvasRef.current) {
+      canvasRef.current.redo();
+    }
+  };
+
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Poll undo/redo state
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (canvasRef.current) {
+        setCanUndo(canvasRef.current.canUndo());
+        setCanRedo(canvasRef.current.canRedo());
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -135,6 +165,20 @@ export default function App() {
         </View>
 
         <View style={styles.rightControls}>
+          <TouchableOpacity 
+            style={[styles.undoButton, !canUndo && styles.disabledButton]} 
+            onPress={handleUndo}
+            disabled={!canUndo}
+          >
+            <Text style={[styles.buttonText, !canUndo && styles.disabledButtonText]}>↩</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.redoButton, !canRedo && styles.disabledButton]} 
+            onPress={handleRedo}
+            disabled={!canRedo}
+          >
+            <Text style={[styles.buttonText, !canRedo && styles.disabledButtonText]}>↪</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
             <Text style={styles.clearButtonText}>Clear</Text>
           </TouchableOpacity>
@@ -283,5 +327,25 @@ const styles = StyleSheet.create({
   canvasContainer: {
     flex: 1,
     backgroundColor: '#ffff',
+  },
+  undoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    marginRight: 8,
+  },
+  redoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    marginRight: 8,
+  },
+  disabledButton: {
+    backgroundColor: '#e0e0e0',
+  },
+  disabledButtonText: {
+    color: '#999',
   },
 }); 
