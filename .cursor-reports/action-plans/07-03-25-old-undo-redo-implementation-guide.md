@@ -1,7 +1,7 @@
 # Undo/Redo Implementation Guide (07-03-25)
 
 ## Overall Goal
-Implement a robust undo/redo system that tracks the last 15 completed drawing strokes using per-stroke data (Skia Path + DrawingCommand list) rather than full canvas snapshots. This provides intuitive stroke-level undo/redo with minimal memory while integrating cleanly with existing AI drawing features.
+Implement a robust undo/redo system that tracks the last 15 completed drawing strokes using complete canvas state snapshots. This will provide users with intuitive stroke-level undo/redo functionality while maintaining memory efficiency and seamless integration with existing AI drawing features.
 
 ---
 
@@ -11,8 +11,16 @@ Implement a robust undo/redo system that tracks the last 15 completed drawing st
 
 ---
 
-### 0. **Verify Current Code**
-   The current codebase (as of July-2025) no longer contains the previous experimental state-history implementation (`pathHistory`, `historyIndex`, etc.). If you do happen to find any of those remnants in a feature branch, simply delete them. Otherwise, proceed directly to Step&nbsp;1.
+### 0. **Clean-up of Previous Attempts**
+   • **File**: `components/DrawingCanvas.tsx`
+   • Delete the following (and any code that references them):
+      1. `pathHistory`, `setPathHistory`, `historyIndex`, `setHistoryIndex`, `isUndoRedoOperation`, `setIsUndoRedoOperation`
+      2. The constant `MAX_HISTORY_SIZE` (we re-declare it later)
+      3. All implementations of `saveToHistory`, `canUndo`, `canRedo` that used the index model
+      4. The `useEffect` that watches `paths.length` to call `saveToHistory`
+      5. Any `setTimeout(() => saveToHistory(), 0)` calls in `onTouchEnd`, `addAIPath`, etc.
+
+   • Remove the undo/redo logic that manipulates `historyIndex` and slices arrays.
 
 ---
 
@@ -129,24 +137,63 @@ clear: () => {
 
 ### 8. **UI Changes in `App.tsx`**
    • No changes required to the existing buttons – the public API is unchanged.
-   • You can remove the `setInterval` that polls `canUndo`/`canRedo` if you prefer; instead query them directly in the `disabled` prop of the buttons. Keep the interval if you still want debouncing.
+   • You can **remove** the `setInterval` that polls `canUndo/canRedo` if you prefer; call them directly from the button `onPress` disabled prop, or keep the polling if debouncing is important.
 
 ---
 
-### 9. **Manual Validation Steps**
-   1. Draw 3 strokes, undo 3×, redo 3× – the number of rendered strokes should match expectations.
-   2. Draw a mix of user strokes and one AI path, then undo and redo through the full history.
-   3. Draw more than 15 strokes – verify the oldest entries are pruned (`undoStack.current.length` never exceeds 15).
-   4. Tap **Clear** – both stacks should be emptied and undo/redo buttons disabled.
+### 9. **Tests & Validation**
+   Reuse the testing steps from the original guide, but pay special attention to:
+   1. Draw 3 strokes, undo 3×, redo 3× – count of rendered strokes should match.
+   2. Mixed user + AI strokes.
+   3. Memory: ensure `undoStack.current.length` never exceeds 15.
 
 ---
 
-### 10. **Performance & Memory Notes**
-   • Undo/redo are O(1) push/pop operations on two `useRef` stacks (no extra re-renders).
-   • Each history entry stores only a Skia `Path` reference and its command list – <1 MB total for 15 entries under typical usage.
-   • History is pushed synchronously at stroke completion (`onTouchEnd` and `addAIPath`); no timers or extra `useEffect` hooks required.
-   • UI can compute `canUndo` / `canRedo` on demand or with a lightweight polling interval if desired.
+### 10. **Performance Notes**
+   • Undo/redo are O(1) operations (simple array push/pop).
+   • Stacks live in `useRef` – they do not trigger re-renders. Only `setStrokes`/`setPaths` updates the canvas.
 
 ---
 
-**🎉 That's it!** Follow the steps above to add a simple, robust stroke-level undo/redo system with minimal code and zero performance regressions.
+**🎉 That's it!** This two-stack approach eliminates the race conditions and complex bookkeeping while preserving all existing functionality.
+
+---
+
+## Testing & Validation Steps
+
+### 1. **Basic Functionality Testing**
+   • Draw 3-4 strokes and verify undo button becomes enabled
+   • Test undo to previous states and verify canvas renders correctly
+   • Test redo functionality after undoing
+   • Verify buttons are disabled when no undo/redo operations are available
+
+### 2. **History Limit Testing**
+   • Draw more than 15 strokes
+   • Verify that oldest history entries are removed
+   • Confirm memory usage doesn't grow indefinitely
+
+### 3. **AI Integration Testing**
+   • Draw user strokes, trigger AI drawing
+   • Verify AI paths can be undone
+   • Test mixed user/AI drawing scenarios
+
+### 4. **Edge Case Testing**
+   • Test clear function resets history properly
+   • Test undo/redo when canvas is empty
+   • Verify state consistency after multiple undo/redo operations
+
+---
+
+## Performance Considerations
+
+- History snapshots are taken only on completed strokes (not during active drawing)
+- Maximum 15 snapshots prevents excessive memory usage
+- setTimeout ensures state updates complete before history saving
+- Button state updates use 100ms intervals to balance responsiveness and performance
+
+## Memory Estimation
+
+With 15 snapshots of typical drawing data:
+- Each snapshot: ~5-50KB (depending on complexity)
+- Total history memory: ~75KB-750KB maximum
+- Acceptable for mobile device constraints 

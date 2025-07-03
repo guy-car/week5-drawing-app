@@ -10,7 +10,7 @@ export function stamp(label: string) {
   _marks[label] = t;
   if (__DEV__) {
     // Log immediately for inline debugging
-    console.log(`[PERF] ${label}: ${t}`);
+    //console.log(`[PERF] ${label}: ${t}`);
   }
 }
 
