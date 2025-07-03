@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Modal from 'react-native-modal';
 import DrawingCanvas from './components/DrawingCanvas';
 import { analyzeThenDrawWithContext } from './src/api/openai';
 import { riffOnSketch } from './src/api/openai/riffOnSketch';
@@ -35,6 +36,7 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [canvasEmpty, setCanvasEmpty] = useState(true);
+  const [showConfirm, setShowConfirm] = useState(false);
   const canvasRef = useRef<DrawingCanvasRef>(null);
 
   // Poll canvas empty state
@@ -49,25 +51,7 @@ export default function App() {
 
   const handleClear = () => {
     if (canvasRef.current && !canvasEmpty) {
-      Alert.alert(
-        'Clear Canvas',
-        'Are you sure you want to clear all drawings?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Clear',
-            style: 'destructive',
-            onPress: () => {
-              if (canvasRef.current) {
-                canvasRef.current.clear();
-              }
-            }
-          }
-        ]
-      );
+      setShowConfirm(true);
     }
   };
 
@@ -202,14 +186,14 @@ export default function App() {
             onPress={handleUndo}
             disabled={!canUndo}
           >
-            <Text style={[styles.buttonText, !canUndo && styles.disabledButtonText]}>↩ Undo</Text>
+            <Text style={[styles.buttonText, !canUndo && styles.disabledButtonText]}>↩</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.redoButton, !canRedo && styles.disabledButton]} 
             onPress={handleRedo}
             disabled={!canRedo}
           >
-            <Text style={[styles.buttonText, !canRedo && styles.disabledButtonText]}>Redo ↪</Text>
+            <Text style={[styles.buttonText, !canRedo && styles.disabledButtonText]}>↪</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity 
@@ -233,6 +217,38 @@ export default function App() {
           screenHeight={screenHeight - 160}
         />
       </View>
+
+      <Modal
+        isVisible={showConfirm}
+        onBackdropPress={() => setShowConfirm(false)}
+        animationIn="zoomIn"
+        animationOut="zoomOut"
+        backdropColor="transparent"
+        backdropOpacity={0.5}
+        style={styles.modalContainer}
+      >
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Clear canvas?</Text>
+          <Text style={styles.modalMsg}>This will erase all strokes.</Text>
+          <View style={styles.modalRow}>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalCancel]}
+              onPress={() => setShowConfirm(false)}
+            >
+              <Text style={styles.modalCancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalDanger]}
+              onPress={() => {
+                canvasRef.current?.clear();
+                setShowConfirm(false);
+              }}
+            >
+              <Text style={styles.modalDangerTxt}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -312,7 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#ff4444',
+    backgroundColor: '#fc6d6d',
   },
   clearButtonText: {
     fontSize: 14,
@@ -373,5 +389,58 @@ const styles = StyleSheet.create({
   },
   disabledButtonText: {
     color: '#999',
+  },
+  modalContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: { 
+    width: 280, 
+    backgroundColor: '#fff', 
+    borderRadius: 12, 
+    padding: 20,
+    alignItems: 'center'
+  },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  modalMsg: { 
+    fontSize: 14, 
+    color: '#555', 
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  modalRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'center',
+    width: '100%',
+    gap: 8
+  },
+  modalBtn: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center'
+  },
+  modalCancel: { 
+    backgroundColor: '#e0e0e0',
+    marginRight: 8
+  },
+  modalDanger: { 
+    backgroundColor: '#fc6d6d'
+  },
+  modalCancelTxt: { 
+    color: '#333', 
+    fontWeight: '600',
+    fontSize: 16
+  },
+  modalDangerTxt: { 
+    color: '#fff', 
+    fontWeight: '600',
+    fontSize: 16
   },
 }); 
