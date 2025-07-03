@@ -9,3 +9,8 @@
 4. When adding image-manipulation or Skia features, check the Expo release notes to confirm the underlying native API is available.  For example, `SkImage.scaleTo` exists only in Skia ≥0.1.232 (Expo SDK 54+).  Provide graceful fallbacks for older SDKs.
 
 5. Add shared constants/utilities in dedicated files to avoid circular imports.  Circular require cycles can slow startup and sometimes lead to partially-initialised modules.
+
+### Skia resize fallback
+* Current Expo SDK (<54) lacks `SkImage.scaleTo`; our export utility detects this.
+* In dev builds we log a single `info` message once per session; production is silent.
+* When upgrading to SDK 54+, remove the guarded fallback and test at least one export to confirm the message disappears.
