@@ -20,6 +20,7 @@ interface DrawingCanvasRef {
   exportCanvasWithCommands: () => Promise<{ image: string | null; commands: DrawingCommand[] }>;
   addAIPath: (commands: any[]) => void;
   addDebugGrid: () => void;
+  addAICommandIncremental: (command: DrawingCommand) => void;
 }
 
 export default function App() {
@@ -54,7 +55,6 @@ export default function App() {
     console.log('🔍 Starting AI analysis...');
 
     try {
-      // Use the new exportCanvasWithCommands function to get both image and commands
       const canvasData = await canvasRef.current.exportCanvasWithCommands();
       if (!canvasData.image) throw new Error('Failed to export canvas');
 
@@ -65,7 +65,8 @@ export default function App() {
         const summary = vectorSummary(canvasData.commands);
         commands = await riffOnSketch({ 
           image: canvasData.image!,
-          summary
+          summary,
+          onIncrementalDraw: canvasRef.current.addAICommandIncremental
         });
       } else {
         console.log('📊 Using standard mode with context');
@@ -86,9 +87,13 @@ export default function App() {
         `Check console for full analysis.`, 
         [{ text: 'OK' }]
       );
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('❌ AI Integration Test Failed:', error);
-      Alert.alert('AI Test Failed', error instanceof Error ? error.message : 'Unknown error occurred', [{ text: 'OK' }]);
+      Alert.alert(
+        'AI Test Failed', 
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsTestingAI(false);
     }

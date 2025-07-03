@@ -3,6 +3,9 @@ import { DrawingCommand, commandSchema, validateDrawingCommands, OpenAIResponse,
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { VectorSummary } from '../../utils/vectorSummary';
 import { z } from 'zod';
+import { openAIStreamParser } from './streamParser';
+import { stamp } from '../../utils/performance';
+import EventSource from 'react-native-sse';
 
 // Error classes
 class DrawingAPIError extends Error {
@@ -22,9 +25,10 @@ class DrawingValidationError extends Error {
 interface RiffReq {
   image: string;
   summary: VectorSummary;
+  onIncrementalDraw?: (cmd: DrawingCommand) => void;
 }
 
-export async function riffOnSketch({ image, summary }: RiffReq): Promise<DrawingCommand[]> {
+export async function riffOnSketch({ image, summary, onIncrementalDraw }: RiffReq): Promise<DrawingCommand[]> {
   console.log('🎨 Starting riff-on-sketch analysis...');
   console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
 
@@ -39,22 +43,20 @@ export async function riffOnSketch({ image, summary }: RiffReq): Promise<Drawing
   // Step 2: Send to OpenAI Vision API
   console.log('🤖 Sending to OpenAI Vision API...');
 
+  const useStreaming = process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1' && onIncrementalDraw;
+
   try {
-    const res = await fetch(openaiConfig.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiConfig.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Here is a vector summary of the drawing:
+    // Build the shared request payload once so we can reuse it for either EventSource or fallback fetch
+    const requestBody = {
+      model: 'gpt-4o',
+      stream: true,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Here is a vector summary of the drawing:
 ${JSON.stringify(summary, null, 2)}
 
 Based on this analysis, please add creative elements that complement the existing drawing.
@@ -71,25 +73,97 @@ RULES:
 - Circle radius must be between 1-500
 - Use similar segment lengths (around ${Math.round(summary.avgSegment)} units)
 - Respect the existing shape distribution in your additions`
-              },
-              {
-                type: 'image_url',
-                image_url: { url: image }
-              }
-            ]
-          }
-        ],
-        max_tokens: 5000,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'DrawingCommandsSchema',
-            schema: zodToJsonSchema(z.object({
-              commands: z.array(commandSchema)
-            }).strict())
-          }
+            },
+            {
+              type: 'image_url',
+              image_url: { url: image }
+            }
+          ]
         }
-      })
+      ],
+      max_tokens: 5000,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'DrawingCommandsSchema',
+          schema: zodToJsonSchema(z.object({
+            commands: z.array(commandSchema)
+          }).strict())
+        }
+      }
+    };
+
+    // --- STREAMING PATH ----------------------------------------------
+    if (useStreaming) {
+      return await new Promise<DrawingCommand[]>((resolve, reject) => {
+        stamp('first-byte');
+
+        const receivedCommands: DrawingCommand[] = [];
+        let firstCommand = true;
+
+        const parser = openAIStreamParser(
+          (command) => {
+            if (firstCommand) {
+              stamp('first-stroke');
+              firstCommand = false;
+            }
+            receivedCommands.push(command);
+            onIncrementalDraw?.(command);
+          },
+          () => console.log('✅ SSE stream complete')
+        );
+
+        const es = new EventSource(openaiConfig.baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiConfig.apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+          pollingInterval: 0, // disable auto-reconnect; OpenAI closes with [DONE]
+        });
+
+        es.addEventListener('message', (event: any) => {
+          const data: string = event.data;
+          console.log('🔍 SSE received raw data:', JSON.stringify(data));
+          
+          if (data === '[DONE]') {
+            console.log('🏁 SSE stream finished with [DONE]');
+            es.close();
+            resolve(receivedCommands);
+            return;
+          }
+          
+          // Try to parse as OpenAI streaming format
+          try {
+            const parsed = JSON.parse(data);
+            console.log('🔍 SSE parsed object:', JSON.stringify(parsed));
+            if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
+              console.log('🔍 SSE content chunk:', JSON.stringify(parsed.choices[0].delta.content));
+            }
+          } catch (e) {
+            console.log('🔍 SSE not JSON, raw data:', data);
+          }
+          
+          // For now, still try the old parser to see what happens
+          parser(data);
+        });
+
+        es.addEventListener('error', (event: any) => {
+          es.close();
+          reject(new DrawingAPIError('SSE connection error', undefined, JSON.stringify(event)));
+        });
+      });
+    }
+
+    // --- NON-STREAMING FALLBACK --------------------------------------
+    const res = await fetch(openaiConfig.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+      },
+      body: JSON.stringify({ ...requestBody, stream: false })
     });
 
     if (!res.ok) {
@@ -105,6 +179,7 @@ RULES:
       }
     }
 
+    // Handle classic JSON response
     const data: OpenAIResponse = await res.json();
     console.log('🎉 OpenAI API Response:', JSON.stringify(data, null, 2));
 
@@ -153,8 +228,6 @@ RULES:
     throw new Error('An unexpected error occurred while processing drawing commands');
   }
 } 
-
-import { openAIStreamParser } from './streamParser';
 
 /**
  * TEST FUNCTION: Validates streaming parser with realistic OpenAI data

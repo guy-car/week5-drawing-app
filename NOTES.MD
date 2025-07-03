@@ -81,6 +81,29 @@ response_format: {
 
 This ensures the response is validated correctly and matches the expected format. Incorrect structuring can lead to validation errors and unexpected behavior.
 
+### Streaming Support
+
+When `process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1'`, the API uses Server-Sent Events (SSE) format by setting `stream: true`. This enables real-time drawing as commands arrive:
+
+```typescript
+{
+  model: 'gpt-4o',
+  stream: true,  // Enable SSE streaming
+  // ... other options unchanged
+}
+```
+
+The SSE response format looks like:
+```
+data: {"type": "moveTo", "x": 100, "y": 200}
+
+data: {"type": "lineTo", "x": 150, "y": 250}
+
+data: [DONE]
+```
+
+Each command is processed immediately through the stream parser and rendered incrementally, achieving first-stroke latency under 3 seconds. The non-streaming code path remains as a fallback for testing and development.
+
 ## Stream Parser Implementation (added 2024-03-21)
 
 The stream parser system consists of two main components designed to handle real-time JSON parsing from OpenAI's streaming API responses. This implementation ensures robust handling of partial JSON objects and Server-Sent Events (SSE) format.
