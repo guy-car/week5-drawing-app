@@ -153,3 +153,93 @@ RULES:
     throw new Error('An unexpected error occurred while processing drawing commands');
   }
 } 
+
+import { openAIStreamParser } from './streamParser';
+
+/**
+ * TEST FUNCTION: Validates streaming parser with realistic OpenAI data
+ * Call this from your drawing app to test before implementing full streaming
+ */
+export async function testStreamingParser(): Promise<DrawingCommand[]> {
+  console.log('🧪 Testing streaming parser with realistic data...');
+  
+  const receivedCommands: DrawingCommand[] = [];
+  let isComplete = false;
+
+  const parser = openAIStreamParser(
+    (command) => {
+      console.log('🎨 Parsed command:', command);
+      receivedCommands.push(command);
+    },
+    () => {
+      console.log('✅ Stream parsing complete!');
+      isComplete = true;
+    }
+  );
+
+  // Simulate realistic OpenAI streaming response
+  const mockStreamChunks = [
+    // OpenAI metadata (should be ignored)
+    'data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n',
+    
+    // Drawing commands - some split across chunks (REAL TEST!)
+    'data: {"type":"move',  // Split command
+    'To","x":100,"y":100}\n\n',  // Complete the split
+    
+    'data: {"type":"lineTo","x":200,"y":100}\n\n',  // Complete command
+    
+    'data: {"type":"lineTo","x":200,"y":200}\n\n',
+    
+    // Split in middle of property name (EDGE CASE!)
+    'data: {"type":"quad',
+    'To","x1":200,"y1":200,"x2":250,"y2":150,"x3":300,"y3":200}\n\n',
+    
+    'data: {"type":"addCircle","cx":150,"cy":150,"radius":30}\n\n',
+    
+    // More OpenAI metadata (should be ignored)
+    'data: {"id":"chatcmpl-test","choices":[{"delta":{"content":""},"finish_reason":"stop"}]}\n\n',
+    
+    'data: [DONE]\n\n'
+  ];
+
+  // Process chunks sequentially (simulating network arrival)
+  for (const chunk of mockStreamChunks) {
+    console.log('📡 Processing chunk:', JSON.stringify(chunk.slice(0, 50)) + '...');
+    parser(chunk);
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  console.log(`🎉 Test complete! Received ${receivedCommands.length} commands`);
+  console.log('📋 Commands:', receivedCommands);
+  
+  if (!isComplete) {
+    throw new Error('Stream did not complete properly');
+  }
+
+  if (receivedCommands.length !== 5) {
+    throw new Error(`Expected 5 commands, got ${receivedCommands.length}`);
+  }
+
+  // Validate specific commands
+  const expectedCommands = [
+    { type: 'moveTo', x: 100, y: 100 },
+    { type: 'lineTo', x: 200, y: 100 },
+    { type: 'lineTo', x: 200, y: 200 },
+    { type: 'quadTo', x1: 200, y1: 200, x2: 250, y2: 150, x3: 300, y3: 200 },
+    { type: 'addCircle', cx: 150, cy: 150, radius: 30 }
+  ];
+
+  for (let i = 0; i < expectedCommands.length; i++) {
+    const received = receivedCommands[i];
+    const expected = expectedCommands[i];
+    
+    if (JSON.stringify(received) !== JSON.stringify(expected)) {
+      throw new Error(`Command ${i} mismatch. Expected: ${JSON.stringify(expected)}, Got: ${JSON.stringify(received)}`);
+    }
+  }
+
+  console.log('✅ ALL TESTS PASSED! Streaming parser is working correctly!');
+  return receivedCommands;
+}

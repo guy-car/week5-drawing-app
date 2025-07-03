@@ -5,3 +5,4 @@ export { proceedWithAPICall } from './proceedWithAPICall';
 export { testCreativeDrawing } from './drawingCommands'; 
 export { analyzeThenDraw } from './proceedWithAPICall';
 export { analyzeThenDrawWithContext } from './proceedWithAPICall';
+export { streamParser, openAIStreamParser } from './streamParser';
