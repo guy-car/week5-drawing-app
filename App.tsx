@@ -27,17 +27,47 @@ interface DrawingCanvasRef {
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+  isEmpty: () => boolean;
 }
 
 export default function App() {
   const [mode, setMode] = useState<'draw' | 'pan'>('draw');
   const [zoom, setZoom] = useState(1);
   const [isTestingAI, setIsTestingAI] = useState(false);
+  const [canvasEmpty, setCanvasEmpty] = useState(true);
   const canvasRef = useRef<DrawingCanvasRef>(null);
 
+  // Poll canvas empty state
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (canvasRef.current) {
+        setCanvasEmpty(canvasRef.current.isEmpty());
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleClear = () => {
-    if (canvasRef.current) {
-      canvasRef.current.clear();
+    if (canvasRef.current && !canvasEmpty) {
+      Alert.alert(
+        'Clear Canvas',
+        'Are you sure you want to clear all drawings?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Clear',
+            style: 'destructive',
+            onPress: () => {
+              if (canvasRef.current) {
+                canvasRef.current.clear();
+              }
+            }
+          }
+        ]
+      );
     }
   };
 
@@ -154,8 +184,12 @@ export default function App() {
         </View>
 
         <View style={styles.rightControls}>
-          <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-            <Text style={styles.clearButtonText}>Clear</Text>
+          <TouchableOpacity 
+            style={[styles.clearButton, canvasEmpty && styles.disabledButton]} 
+            onPress={handleClear}
+            disabled={canvasEmpty}
+          >
+            <Text style={[styles.clearButtonText, canvasEmpty && styles.disabledButtonText]}>Clear</Text>
           </TouchableOpacity>
         </View>
       </View>
