@@ -260,6 +260,42 @@ With this scaffold, `npm test` can run anywhere (CI or local).
   4. In parser callback dispatch only objects with `type` field to `addAICommandIncremental`.
 * **🔎 Manual timing**: open dev menu → Performance Monitor; log `stamp` labels and confirm `< 3 s`.
 
+#### **IMPORTANT UPDATE - OpenAI Streaming Format**
+* **❗ Key Discovery**: OpenAI doesn't stream complete drawing commands. Instead, it streams JSON character by character:
+  ```json
+  {"choices":[{"delta":{"content":"{"}}]}
+  {"choices":[{"delta":{"content":"\"commands\""}}]}
+  {"choices":[{"delta":{"content":"\":["}}]}
+  {"choices":[{"delta":{"content":"{\"type\":\"move"}}]}
+  ```
+
+* **✅ Solution**: Use our existing `streamParser` from Stage 6:
+  1. Extract `content` from each OpenAI chunk:
+     ```typescript
+     if (parsed.choices?.[0]?.delta?.content) {
+         const chunk = parsed.choices[0].delta.content;
+         jsonParser(chunk);  // Our parser handles accumulation!
+     }
+     ```
+  2. The parser will:
+     - Accumulate chunks in its buffer
+     - Track JSON nesting depth
+     - Fire callback when it finds complete objects
+     - Perfect for real-time drawing!
+
+* **🎯 Expected Timeline**:
+  1. SSE connects → `first-byte` stamp
+  2. Content chunks arrive and accumulate
+  3. First complete command parsed (~1-2s) → `first-stroke` stamp
+  4. Subsequent commands parsed and drawn in real-time
+  5. Stream ends with `finish_reason: "stop"`
+
+* **📝 Implementation Notes**:
+  - Use `react-native-sse` for POST body support
+  - Feed only content chunks to parser (not OpenAI metadata)
+  - Keep performance stamps for latency verification
+  - No need to wait for stream completion to start drawing
+
 ### **Stage 8 – Performance timestamps**
 * **🛠** In `DrawingCanvas` exportCanvasWithCommands path: `stamp('img-ready')`.
 * **🛠** In `riffOnSketch` before first SSE chunk: `stamp('first-chunk')`.
