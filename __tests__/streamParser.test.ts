@@ -1,6 +1,21 @@
 import { streamParser, openAIStreamParser } from '../src/api/openai/streamParser';
+import { streamLog } from '../src/api/openai/config';
+
+// Mock the streamLog to prevent console output during tests
+jest.mock('../src/api/openai/config', () => ({
+  streamLog: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn()
+  }
+}));
 
 describe('streamParser', () => {
+  beforeEach(() => {
+    // Clear all mocks before each test
+    jest.clearAllMocks();
+  });
+
   it('should parse complete JSON objects', () => {
     const callback = jest.fn();
     const parser = streamParser(callback);
@@ -102,24 +117,19 @@ describe('streamParser', () => {
 
   it('should handle invalid JSON gracefully', () => {
     const callback = jest.fn();
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
     const parser = streamParser(callback);
     
     parser('{"type":"test","invalid":}');
     
     expect(callback).not.toHaveBeenCalled();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to parse JSON chunk:',
-      '{"type":"test","invalid":}',
+    expect(streamLog.warn).toHaveBeenCalledWith(
+      '❌ Failed to parse object JSON:',
       expect.any(Error)
     );
-    
-    consoleSpy.mockRestore();
   });
 
   it('should continue parsing after invalid JSON', () => {
     const callback = jest.fn();
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
     const parser = streamParser(callback);
     
     parser('{"invalid":}{"type":"valid","x":1}');
@@ -128,8 +138,6 @@ describe('streamParser', () => {
       type: 'valid',
       x: 1
     });
-    
-    consoleSpy.mockRestore();
   });
 
   it('should handle empty chunks', () => {

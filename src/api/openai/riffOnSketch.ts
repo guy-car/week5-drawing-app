@@ -1,4 +1,4 @@
-import { openaiConfig } from './config';
+import { openaiConfig, streamLog } from './config';
 import { DrawingCommand, commandSchema, validateDrawingCommands, OpenAIResponse, OpenAIResponseSchema } from './types';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { VectorSummary } from '../../utils/vectorSummary';
@@ -29,24 +29,18 @@ interface RiffReq {
 }
 
 export async function riffOnSketch({ image, summary, onIncrementalDraw }: RiffReq): Promise<DrawingCommand[]> {
-  console.log('🎨 Starting riff-on-sketch analysis...');
-  console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
+  streamLog.info('🎨 Starting riff-on-sketch analysis...');
 
   // Step 1: Validate inputs
-  console.log('📊 Validating inputs...');
   if (!image) {
     throw new DrawingAPIError('Failed to export canvas image');
   }
-  console.log('✅ Inputs validated successfully');
-  console.log('📈 Vector summary:', JSON.stringify(summary, null, 2));
 
   // Step 2: Send to OpenAI Vision API
-  console.log('🤖 Sending to OpenAI Vision API...');
-
   const useStreaming = process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1' && onIncrementalDraw;
 
   try {
-    // Build the shared request payload once so we can reuse it for either EventSource or fallback fetch
+    // Build the shared request payload
     const requestBody = {
       model: 'gpt-4o',
       stream: true,
@@ -103,20 +97,14 @@ RULES:
 
         const parser = openAIStreamParser(
           (command) => {
-            console.log('🎯 riffOnSketch received individual command from parser:', JSON.stringify(command));
             if (firstCommand) {
               stamp('first-stroke');
               firstCommand = false;
-              console.log('⏱️ First command received - performance stamp logged');
             }
             receivedCommands.push(command);
-            console.log('📦 Command added to receivedCommands array. Total commands so far:', receivedCommands.length);
-            
-            console.log('🖼️ About to call onIncrementalDraw with command:', JSON.stringify(command));
             onIncrementalDraw?.(command);
-            console.log('✅ onIncrementalDraw callback completed for command:', command.type);
           },
-          () => console.log('✅ SSE stream complete')
+          () => streamLog.info('✨ Stream complete')
         );
 
         const es = new EventSource(openaiConfig.baseUrl, {
@@ -126,30 +114,27 @@ RULES:
             'Authorization': `Bearer ${openaiConfig.apiKey}`,
           },
           body: JSON.stringify(requestBody),
-          pollingInterval: 0, // disable auto-reconnect; OpenAI closes with [DONE]
+          pollingInterval: 0,
         });
 
         es.addEventListener('message', (event: any) => {
           const data: string = event.data;
           
           if (data === '[DONE]') {
-            console.log('🏁 SSE stream finished with [DONE]');
+            streamLog.info(`✨ Stream finished with ${receivedCommands.length} total commands`);
             es.close();
             resolve(receivedCommands);
             return;
           }
           
-          // Parse the OpenAI streaming format and extract content
           try {
             const parsed = JSON.parse(data);
             if (parsed.choices?.[0]?.delta?.content) {
               const contentChunk = parsed.choices[0].delta.content;
-              console.log('🔍 Content chunk:', contentChunk);
-              // Feed only the content chunk to our JSON parser
               parser(contentChunk);
             }
           } catch (e) {
-            console.warn('Failed to parse SSE data:', e);
+            streamLog.warn('Failed to parse SSE data:', e);
           }
         });
 
@@ -172,7 +157,7 @@ RULES:
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.error('❌ OpenAI API Error:', res.status, errorText);
+      streamLog.warn('OpenAI API Error:', res.status, errorText);
 
       if (res.status === 401) {
         throw new DrawingAPIError('Invalid API key. Please check your EXPO_PUBLIC_OPENAI_API_KEY in .env file.', res.status, errorText);
@@ -185,13 +170,12 @@ RULES:
 
     // Handle classic JSON response
     const data: OpenAIResponse = await res.json();
-    console.log('🎉 OpenAI API Response:', JSON.stringify(data, null, 2));
 
     // Validate OpenAI response structure
     try {
       OpenAIResponseSchema.parse(data);
     } catch (error) {
-      console.error('OpenAI response validation failed:', error);
+      streamLog.warn('OpenAI response validation failed:', error);
       throw new DrawingValidationError('Invalid OpenAI response format', error);
     }
 
@@ -200,27 +184,23 @@ RULES:
     }
 
     let aiResponse = data.choices[0].message.content;
-    console.log('🤖 AI Generated Commands:', aiResponse);
-
-    // Clean the response (shouldn't need this with json_schema but keeping as fallback)
     aiResponse = aiResponse.replace(/```json|```/g, '').trim();
 
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(aiResponse);
     } catch (error) {
-      console.error('JSON parsing failed:', error);
+      streamLog.warn('JSON parsing failed:', error);
       throw new DrawingValidationError('Failed to parse AI response as JSON', error);
     }
 
     if (!parsedResponse.commands || !Array.isArray(parsedResponse.commands)) {
-      console.error('Invalid commands array:', parsedResponse);
       throw new DrawingValidationError('AI response does not contain a valid commands array');
     }
 
-    // Validate and transform the commands using our enhanced validation
+    // Validate and transform the commands
     const validatedCommands = validateDrawingCommands(parsedResponse.commands);
-    console.log('✅ Successfully validated AI commands:', validatedCommands);
+    streamLog.info(`✨ Successfully validated ${validatedCommands.length} AI commands`);
 
     return validatedCommands;
 
@@ -228,10 +208,10 @@ RULES:
     if (error instanceof DrawingAPIError || error instanceof DrawingValidationError) {
       throw error;
     }
-    console.error('❌ Unexpected error:', error);
+    streamLog.warn('Unexpected error:', error);
     throw new Error('An unexpected error occurred while processing drawing commands');
   }
-} 
+}
 
 /**
  * TEST FUNCTION: Validates streaming parser with realistic OpenAI data
