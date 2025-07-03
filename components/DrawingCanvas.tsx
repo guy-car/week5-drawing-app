@@ -9,8 +9,9 @@ import Animated, {
   useDerivedValue
 } from 'react-native-reanimated';
 import { DrawingCommand } from '../src/api/openai/types';
+import { exportCanvas } from '../src/utils/canvasExport';
+import { BASE_CANVAS_SIZE } from '../src/constants/canvas';
 
-const BASE_CANVAS_SIZE = 1000;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
@@ -25,7 +26,7 @@ interface DrawingCanvasProps {
 interface DrawingCanvasRef {
   clear: () => void;
   handleZoom: (increment: boolean) => void;
-  exportCanvas: () => Promise<string | null>;
+  exportCanvas: (canvasRef: any) => Promise<string | null>;
   exportCanvasWithCommands: () => Promise<{ image: string | null; commands: DrawingCommand[] }>;
   addAIPath: (commands: DrawingCommand[]) => void;
   addDebugGrid: () => void;
@@ -83,43 +84,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       onZoomChange(newScale);
     };
 
-    const exportCanvas = async (): Promise<string | null> => {
-      try {
-        if (!canvasRef.current) {
-          console.error('Canvas ref is not available');
-          return null;
-        }
-
-        // Create an image snapshot of the current canvas
-        const image = canvasRef.current.makeImageSnapshot();
-        if (!image) {
-          console.error('Failed to create image snapshot');
-          return null;
-        }
-
-        // Encode the image as PNG and get base64 data
-        const bytes = image.encodeToBytes();
-        if (!bytes) {
-          console.error('Failed to encode image to bytes');
-          return null;
-        }
-
-        // Convert bytes to base64 string
-        const base64 = bytes.reduce((data, byte) => data + String.fromCharCode(byte), '');
-        const base64String = btoa(base64);
-        
-        console.log('✅ Canvas exported successfully, base64 length:', base64String.length);
-        return `data:image/png;base64,${base64String}`;
-      } catch (error) {
-        console.error('❌ Error exporting canvas:', error);
-        return null;
-      }
-    };
-
     const exportCanvasWithCommands = async (): Promise<{ image: string | null; commands: DrawingCommand[] }> => {
       try {
-        // Get the canvas image using the existing exportCanvas function
-        const image = await exportCanvas();
+        // Export a lightweight 256-px JPEG snapshot to minimise upload time
+        const image = await exportCanvas(canvasRef, { resize: 256, format: 'jpeg', quality: 0.6 });
         
         // Return both image and captured commands
         const result = {
@@ -272,7 +240,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         console.log('🧹 Cleared canvas and user commands');
       },
       handleZoom,
-      exportCanvas,
+      exportCanvas: () => exportCanvas(canvasRef, { resize: 256, format: 'jpeg', quality: 0.6 }),
       exportCanvasWithCommands,
       addAIPath,
       addDebugGrid,

@@ -81,11 +81,14 @@ With this scaffold, `npm test` can run anywhere (CI or local).
 
 ### **Stage 1 – Extract export utility**
 * **🛠 Code changes**
-  1. Create `src/utils/canvasExport.ts`:
+  1. **Create a central constants file** `src/constants/canvas.ts` so we don't import `DrawingCanvas` from utils (this removes the require-cycle warning):
      ```ts
-     import { BASE_CANVAS_SIZE } from '../../components/DrawingCanvas';
+     export const BASE_CANVAS_SIZE = 1000;
+     ```
+  2. Create `src/utils/canvasExport.ts`:
+     ```ts
+     import { BASE_CANVAS_SIZE } from '../constants/canvas';
      import { Skia } from '@shopify/react-native-skia';
-
      // Original function copied verbatim for now (PNG only)
      export const exportCanvas = async (canvasRef: any): Promise<string | null> => {
        if (!canvasRef.current) return null;
@@ -95,19 +98,21 @@ With this scaffold, `npm test` can run anywhere (CI or local).
        return `data:image/png;base64,${btoa(b64)}`;
      };
      ```
-  2. In `components/DrawingCanvas.tsx` **remove** the existing `exportCanvas` definition and instead:
-     ```ts
-     import { exportCanvas } from '../utils/canvasExport';
-     ```
+  3. In `components/DrawingCanvas.tsx`
+     * import the constant from the new file: `import { BASE_CANVAS_SIZE } from '../constants/canvas';`
+     * remove the old inline `exportCanvas` definition and instead:
+      ```ts
+      import { exportCanvas } from '../utils/canvasExport';
+      ```
      Remember `exportCanvas(canvasRef)` now takes the ref as arg.
-  3. Keep `exportCanvasWithCommands` – just update its call: `const image = await exportCanvas(canvasRef);`
+  4. Keep `exportCanvasWithCommands` – just update its call: `const image = await exportCanvas(canvasRef);`
 * **🔎 Test instructions**
   1. `npm test` – should still be green (no drawing tests yet).
   2. Manual: draw stroke → trigger existing "AI test" button; nothing should crash.
 
 ### **Stage 2 – Lightweight snapshot**
 * **🛠 Code changes**
-  1. In `canvasExport.ts` overload:
+  1. In `canvasExport.ts` overload **and add a safe resizing fallback**:
      ```ts
      interface ExportOpts { resize?: number; format?: 'png'|'jpeg'; quality?: number; }
 
@@ -119,13 +124,35 @@ With this scaffold, `npm test` can run anywhere (CI or local).
        if (!canvasRef.current) return null;
        const img     = canvasRef.current.makeImageSnapshot();
        const factor  = resize / BASE_CANVAS_SIZE;
-       const scaled  = factor < 1 ? img.scaleTo(factor) : img; // Skia 0.1.232+
+       // Skia <0.1.232 (shipped in Expo 53) doesn't expose `scaleTo`, so we
+       // detect its presence at runtime. If missing we fall back to exporting
+       // the original resolution *or* (optional) use `expo-image-manipulator`
+       // to downsize purely in JS.
+       let scaled = img;
+       if (factor < 1) {
+         if (typeof img.scaleTo === 'function') {
+           scaled = img.scaleTo(factor);
+         } else {
+           console.warn('Skia: img.scaleTo not available – exporting at original resolution');
+           // Optional JS fallback (commented):
+           // const { base64 } = await ImageManipulator.manipulateAsync(
+           //   `data:image/png;base64,${btoa(img.encodeToBytes().reduce((d,b)=>d+String.fromCharCode(b),''))}`,
+           //   [{ resize: { width: resize } }],
+           //   { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64:true }
+           // );
+           // return `data:image/${format};base64,${base64}`;
+         }
+       }
        const bytes   = scaled.encodeToBytes(format.toUpperCase(), quality * 100);
        const b64 = bytes.reduce((d, b) => d + String.fromCharCode(b), '');
        return `data:image/${format};base64,${btoa(b64)}`;
      };
      ```
   2. Update all call-sites: `exportCanvas(canvasRef, { resize:256 })`.
+
+  3. **Dependency discipline** → Add a note to use `expo install` for any
+     native package (`react-native-reanimated`, `@shopify/react-native-skia`)
+     to avoid accidental version bumps.
 * **🔎 Jest test `__tests__/canvasExport.test.ts`**
   ```ts
   import { exportCanvas } from '../canvasExport';
