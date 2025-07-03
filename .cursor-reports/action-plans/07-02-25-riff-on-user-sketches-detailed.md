@@ -10,6 +10,7 @@ Deliver a fast (< 3 s-to-first-stroke) AI-assist feature that:
 
 ## Actions & Pseudocode
 
+
 ### 1  Light-weight canvas snapshot  
 *File(s):* `components/DrawingCanvas.tsx`
 
