@@ -14,3 +14,25 @@
 * Current Expo SDK (<54) lacks `SkImage.scaleTo`; our export utility detects this.
 * In dev builds we log a single `info` message once per session; production is silent.
 * When upgrading to SDK 54+, remove the guarded fallback and test at least one export to confirm the message disappears.
+
+### GPT model
+'gpt-4-vision-preview' is deprecated
+'gpt-4o' is the correct model to use
+
+## OpenAI API Call Structure
+
+When making API calls to OpenAI, ensure the `response_format` is structured correctly:
+
+```typescript
+response_format: {
+  type: 'json_schema',
+  json_schema: {
+    name: 'DrawingCommandsSchema',
+    schema: zodToJsonSchema(z.object({
+      commands: z.array(commandSchema)
+    }).strict())
+  }
+}
+```
+
+This ensures the response is validated correctly and matches the expected format. Incorrect structuring can lead to validation errors and unexpected behavior.
