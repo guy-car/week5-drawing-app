@@ -80,3 +80,111 @@ response_format: {
 ```
 
 This ensures the response is validated correctly and matches the expected format. Incorrect structuring can lead to validation errors and unexpected behavior.
+
+## Stream Parser Implementation (added 2024-03-21)
+
+The stream parser system consists of two main components designed to handle real-time JSON parsing from OpenAI's streaming API responses. This implementation ensures robust handling of partial JSON objects and Server-Sent Events (SSE) format.
+
+### Core JSON Stream Parser
+
+The base `streamParser` handles incremental JSON parsing with these key features:
+
+1. **State Tracking**
+   - Maintains brace depth count for nested objects
+   - Tracks string context to ignore braces in strings
+   - Handles escape sequences properly
+   - Buffers incomplete JSON across chunks
+
+2. **Buffer Management**
+   ```typescript
+   // Example of partial JSON handling:
+   Chunk 1: '{"type": "moveTo", "x'
+   Chunk 2: '": 100, "y": 200}'
+   // Parser correctly combines and emits: {"type": "moveTo", "x": 100, "y": 200}
+   ```
+
+3. **Error Handling**
+   - Graceful recovery from malformed JSON
+   - Maintains parser state across errors
+   - Logs warnings for debugging
+
+### OpenAI SSE Parser
+
+The `openAIStreamParser` wraps the core parser to handle OpenAI's specific SSE format:
+
+1. **SSE Format**
+   ```
+   data: {"type": "moveTo", "x": 100, "y": 200}
+
+   data: {"type": "lineTo", "x": 150, "y": 250}
+
+   data: [DONE]
+   ```
+
+2. **Features**
+   - Strips "data: " prefix
+   - Handles multi-line events
+   - Processes [DONE] signal
+   - Filters for drawing commands (objects with 'type' field)
+
+### Usage Pattern
+
+```typescript
+const parser = openAIStreamParser(
+  (command) => {
+    // Handle each drawing command as it arrives
+    processDrawingCommand(command);
+  },
+  () => {
+    // Handle stream completion
+    finishDrawing();
+  }
+);
+
+// Feed chunks as they arrive from the API
+response.on('data', chunk => parser(chunk.toString()));
+```
+
+### Implementation Notes
+
+1. **Partial Object Handling**
+   - Parser maintains state between chunks
+   - Handles JSON split at any position
+   - Preserves incomplete objects in buffer
+
+2. **Memory Efficiency**
+   - Cleans buffer after complete objects
+   - Only retains necessary incomplete data
+   - No unnecessary string copies
+
+3. **Error Recovery**
+   - Continues processing after parse errors
+   - Maintains stream integrity
+   - Logs issues without crashing
+
+4. **Performance**
+   - Single-pass character processing
+   - Minimal string operations
+   - Efficient buffer management
+
+### Testing Considerations
+
+When writing tests for streaming functionality:
+
+1. **Edge Cases**
+   - Split JSON at various positions
+   - Nested objects and arrays
+   - Escaped quotes and braces
+   - Multiple commands in one chunk
+
+2. **SSE Format**
+   - Partial "data: " prefixes
+   - Multi-line events
+   - [DONE] signal handling
+   - Invalid event formats
+
+3. **Error Conditions**
+   - Malformed JSON
+   - Invalid UTF-8 sequences
+   - Buffer overflow scenarios
+   - Network interruptions

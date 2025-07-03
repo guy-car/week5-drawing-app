@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DrawingCanvas from './components/DrawingCanvas';
 import { analyzeThenDraw, analyzeThenDrawWithContext } from './src/api/openai';
-import { riffOnSketch } from './src/api/openai/riffOnSketch';
+import { riffOnSketch, testStreamingParser } from './src/api/openai/riffOnSketch';
 import { DrawingCommand } from './src/api/openai/types';
 import { vectorSummary } from './src/utils/vectorSummary';
 
@@ -94,6 +94,17 @@ export default function App() {
     }
   };
 
+  const testStreaming = async () => {
+    try {
+      const commands = await testStreamingParser();
+      console.log('🎉 Streaming parser works!', commands);
+      alert(`Success! Parsed ${commands.length} commands`);
+    } catch (error) {
+      console.error('❌ Streaming parser failed:', error);
+      alert(`Failed: ${error.message}`);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="auto" />
@@ -136,6 +147,9 @@ export default function App() {
 
       {/* AI Button */}
       <View style={styles.aiTestContainer}>
+        <TouchableOpacity onPress={testStreaming}>
+          <Text>🧪 Test Streaming Parser</Text>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.aiTestButton, isTestingAI && styles.aiTestButtonDisabled]} 
           onPress={proceedWithAPICallHandler}
@@ -145,6 +159,7 @@ export default function App() {
             {isTestingAI ? '🧪 Processing...' : '🤖 AI Draw'}
           </Text>
         </TouchableOpacity>
+
       </View>
 
       {/* Canvas */}
@@ -244,12 +259,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   aiTestContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-    alignItems: 'center',
   },
   aiTestButton: {
     backgroundColor: '#28a745',
