@@ -1,3 +1,16 @@
+/**
+ * 🐛 DEBUG MODE: Extensive logging added to investigate color-related bugs
+ * 
+ * Look for these log patterns:
+ * 🎯 STROKE START/MOVE - Tracks command accumulation per stroke
+ * 🚨 CRITICAL BUG CHECK - Shows if ALL commands are captured per stroke (should only be current stroke)
+ * 🚨 RENDER BUG - Shows path-stroke mapping failures (fallback to #000000)
+ * 🤖 AI PATH - Shows AI stroke color handling
+ * 🚨 INCREMENTAL AI - Shows incremental AI drawing issues (missing stroke entries)
+ * ↩️↪️ UNDO/REDO - Shows undo/redo color preservation
+ * 🧹 CLEAR - Shows canvas clearing behavior
+ */
+
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Canvas, Path, Skia, Group, Rect, useCanvasRef } from '@shopify/react-native-skia';
@@ -139,7 +152,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const addAIPath = (commands: DrawingCommand[]) => {
       try {
-        console.log('🎯 AI Commands received:', commands);
+        console.log('🤖 AI PATH - Received commands:', commands.length);
+        console.log('🤖 AI PATH - Selected color for AI stroke:', selectedColor);
+        
         const aiPath = buildPathFromCommands(commands);
         const stroke: Stroke = { 
           path: aiPath, 
@@ -147,14 +162,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           color: selectedColor  // Use current selected color for AI strokes
         };
 
-        setStrokes(prev => [...prev, stroke]);
-        setPaths(prev => [...prev, aiPath]);
+        console.log('🤖 AI PATH - Created stroke with color:', stroke.color);
+
+        setStrokes(prev => {
+          const newStrokes = [...prev, stroke];
+          console.log('🤖 AI PATH - Total strokes after AI add:', newStrokes.length);
+          return newStrokes;
+        });
+        setPaths(prev => {
+          const newPaths = [...prev, aiPath];
+          console.log('🤖 AI PATH - Total paths after AI add:', newPaths.length);
+          return newPaths;
+        });
 
         undoStack.current.push(stroke);
         redoStack.current = [];
         if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
 
-        console.log(`✅ AI path added successfully with ${commands.length} commands`);
+        console.log(`✅ AI path added successfully with ${commands.length} commands and color ${stroke.color}`);
       } catch (error) {
         console.error('❌ Error adding AI path:', error);
       }
@@ -179,15 +204,23 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const addAICommandIncremental = (command: DrawingCommand) => {
       try {
-        streamLog.debug('📍 Processing AI command:', command.type);
+        console.log('🚨 INCREMENTAL AI - Processing command:', command.type);
+        console.log('🚨 INCREMENTAL AI - Current selectedColor:', selectedColor);
         
         if (!aiPathRef.current) {
           aiPathRef.current = Skia.Path.Make();
+          console.log('🚨 INCREMENTAL AI - Created new AI path');
         }
         
         buildPathFromCommands([command], aiPathRef.current);
-        setPaths(prev => [...prev.filter(p => p !== aiPathRef.current), aiPathRef.current]);
+        setPaths(prev => {
+          const newPaths = [...prev.filter(p => p !== aiPathRef.current), aiPathRef.current];
+          console.log('🚨 INCREMENTAL AI - Updated paths, total:', newPaths.length);
+          console.log('🚨 INCREMENTAL AI BUG - This AI path has NO stroke entry with color info!');
+          return newPaths;
+        });
       } catch (error) {
+        console.log('❌ Error processing incremental AI command:', error);
         streamLog.warn('❌ Error processing AI command:', error);
       }
     };
@@ -198,21 +231,43 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const undo = () => {
       if (!canUndo()) return;
       const last = undoStack.current.pop()!;
+      console.log('↩️  UNDO - Removing stroke with color:', last.color, 'commands:', last.commands.length);
       redoStack.current.push(last);
-      setStrokes(prev => prev.slice(0, -1));
-      setPaths(prev => prev.slice(0, -1));
+      setStrokes(prev => {
+        const newStrokes = prev.slice(0, -1);
+        console.log('↩️  UNDO - Strokes count:', prev.length, '→', newStrokes.length);
+        return newStrokes;
+      });
+      setPaths(prev => {
+        const newPaths = prev.slice(0, -1);
+        console.log('↩️  UNDO - Paths count:', prev.length, '→', newPaths.length);
+        return newPaths;
+      });
     };
 
     const redo = () => {
       if (!canRedo()) return;
       const stroke = redoStack.current.pop()!;
+      console.log('↪️  REDO - Restoring stroke with color:', stroke.color, 'commands:', stroke.commands.length);
       undoStack.current.push(stroke);
-      setStrokes(prev => [...prev, stroke]);
-      setPaths(prev => [...prev, stroke.path]);
+      setStrokes(prev => {
+        const newStrokes = [...prev, stroke];
+        console.log('↪️  REDO - Strokes count:', prev.length, '→', newStrokes.length);
+        return newStrokes;
+      });
+      setPaths(prev => {
+        const newPaths = [...prev, stroke.path];
+        console.log('↪️  REDO - Paths count:', prev.length, '→', newPaths.length);
+        return newPaths;
+      });
     };
 
     useImperativeHandle(ref, () => ({
       clear: () => {
+        console.log('🧹 CLEAR - Clearing canvas');
+        console.log('🧹 CLEAR - Before: paths:', paths.length, 'strokes:', strokes.length, 'userCommands:', userCommands.length);
+        console.log('🧹 CLEAR - Current selectedColor remains:', selectedColor);
+        
         setPaths([]);
         setStrokes([]);
         setCurrentPath(null);
@@ -220,6 +275,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         undoStack.current = [];
         redoStack.current = [];
         aiPathRef.current = null;
+        
+        console.log('🧹 CLEAR - Canvas cleared, selectedColor preserved');
       },
       handleZoom,
       exportCanvas: () => exportCanvas(canvasRef, { resize: 256, format: 'jpeg', quality: 0.6 }),
@@ -258,6 +315,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         const path = Skia.Path.Make();
         path.moveTo(canvasCoords.x, canvasCoords.y);
 
+        console.log('🎯 STROKE START - selectedColor:', selectedColor, 'userCommands count before:', userCommands.length);
+
         setCurrentPath({
           path,
           startX: canvasCoords.x,
@@ -267,11 +326,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         });
 
         // Add moveTo command
-        setUserCommands(prev => [...prev, {
-          type: 'moveTo',
-          x: Math.round(canvasCoords.x),
-          y: Math.round(canvasCoords.y)
-        }]);
+        setUserCommands(prev => {
+          const newCommands = [...prev, {
+            type: 'moveTo' as const,
+            x: Math.round(canvasCoords.x),
+            y: Math.round(canvasCoords.y)
+          }];
+          console.log('🎯 STROKE START - userCommands count after adding moveTo:', newCommands.length);
+          return newCommands;
+        });
       }
     };
 
@@ -300,24 +363,44 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         });
 
         // Add lineTo command
-        setUserCommands(prev => [...prev, {
-          type: 'lineTo',
-          x: roundedX,
-          y: roundedY
-        }]);
+        setUserCommands(prev => {
+          const newCommands = [...prev, {
+            type: 'lineTo' as const,
+            x: roundedX,
+            y: roundedY
+          }];
+          console.log('🎯 STROKE MOVE - userCommands count after adding lineTo:', newCommands.length);
+          return newCommands;
+        });
       }
     };
 
     const onTouchEnd = () => {
       if (currentPath) {
+        console.log('🚨 CRITICAL BUG CHECK - onTouchEnd:');
+        console.log('  🎯 Current stroke color:', currentPath.color);
+        console.log('  🎯 Current stroke points count:', currentPath.points.length);
+        console.log('  🚨 TOTAL userCommands being captured:', userCommands.length);
+        console.log('  🚨 All userCommands:', userCommands.map(cmd => `${cmd.type}(...)`).join(', '));
+        
         const stroke: Stroke = {
           path: currentPath.path,
-          commands: [...userCommands],
+          commands: [...userCommands], // ❌ POTENTIAL BUG: capturing ALL commands
           color: currentPath.color
         };
         
-        setStrokes(prev => [...prev, stroke]);
-        setPaths(prev => [...prev, currentPath.path]);
+        console.log('  ✅ Stroke created with', stroke.commands.length, 'commands and color', stroke.color);
+        
+        setStrokes(prev => {
+          const newStrokes = [...prev, stroke];
+          console.log('  ✅ Total strokes now:', newStrokes.length);
+          return newStrokes;
+        });
+        setPaths(prev => {
+          const newPaths = [...prev, currentPath.path];
+          console.log('  ✅ Total paths now:', newPaths.length);
+          return newPaths;
+        });
         
         undoStack.current.push(stroke);
         redoStack.current = [];
@@ -361,15 +444,28 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             height={BASE_CANVAS_SIZE}
             color="#E6F3FF"
           />
-          {paths.map((path, index) => (
-            <Path
-              key={index}
-              path={path}
-              color={strokes[index]?.color || '#000000'}
-              style="stroke"
-              strokeWidth={2}
-            />
-          ))}
+          {paths.map((path, index) => {
+            const matchingStroke = strokes.find(stroke => stroke.path === path);
+            
+            // Log path-stroke mapping issues
+            if (!matchingStroke) {
+              console.log('🚨 RENDER BUG - No matching stroke found for path index:', index);
+              console.log('  🎯 Total paths:', paths.length, 'Total strokes:', strokes.length);
+              console.log('  🚨 Using fallback color #000000');
+            } else {
+              console.log('✅ RENDER OK - Path', index, 'matched with color:', matchingStroke.color);
+            }
+            
+            return (
+              <Path
+                key={index}
+                path={path}
+                color={matchingStroke ? matchingStroke.color : '#000000'}
+                style="stroke"
+                strokeWidth={2}
+              />
+            );
+          })}
           {currentPath && (
             <Path
               path={currentPath.path}

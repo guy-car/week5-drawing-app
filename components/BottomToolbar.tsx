@@ -9,6 +9,9 @@ interface BottomToolbarProps {
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({ color, onColorChange }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
+  
+  // Log color changes for debugging
+  console.log('🎨 TOOLBAR - Current color prop:', color);
 
   return (
     <View style={styles.container}>
@@ -27,7 +30,10 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({ color, onColorChange }) =
           <View style={styles.pickerContainer}>
             <ColorPicker
               color={color}
-              onColorChange={onColorChange}
+              onColorChange={(newColor) => {
+                console.log('🎨 TOOLBAR - Color changed from', color, 'to', newColor);
+                onColorChange(newColor);
+              }}
               thumbSize={40}
               sliderSize={40}
               noSnap={true}

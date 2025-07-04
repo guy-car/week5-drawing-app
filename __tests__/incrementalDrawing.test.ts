@@ -44,9 +44,4 @@ test('buildPathFromCommands appends onto an existing path', () => {
     ['L', 10, 0],
     ['L', 10, 10],
   ]);
-
-  console.log('Type of p1:', typeof p1);
-  console.log('Type of p2:', typeof p2);
-  console.log('p1 has toJSON:', typeof p1.toJSON === 'function');
-  console.log('p2 has toJSON:', typeof p2.toJSON === 'function');
 });

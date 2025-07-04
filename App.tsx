@@ -90,11 +90,12 @@ export default function App() {
         commands = await riffOnSketch({ 
           image: canvasData.image!,
           summary,
-          onIncrementalDraw: canvasRef.current.addAICommandIncremental
+          onIncrementalDraw: canvasRef.current.addAICommandIncremental,
+          selectedColor
         });
       } else {
         streamLog.info('📊 Using standard mode');
-        commands = await analyzeThenDrawWithContext(canvasData.image, canvasData.commands);
+        commands = await analyzeThenDrawWithContext(canvasData.image, canvasData.commands, selectedColor);
       }
 
       canvasRef.current.addAIPath(commands);

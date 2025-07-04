@@ -26,10 +26,12 @@ interface RiffReq {
   image: string;
   summary: VectorSummary;
   onIncrementalDraw?: (cmd: DrawingCommand) => void;
+  selectedColor: string;
 }
 
-export async function riffOnSketch({ image, summary, onIncrementalDraw }: RiffReq): Promise<DrawingCommand[]> {
+export async function riffOnSketch({ image, summary, onIncrementalDraw, selectedColor }: RiffReq): Promise<DrawingCommand[]> {
   streamLog.info('🎨 Starting riff-on-sketch analysis...');
+  streamLog.info('🎨 Using color:', selectedColor);
 
   // Step 1: Validate inputs
   if (!image) {
@@ -50,7 +52,9 @@ export async function riffOnSketch({ image, summary, onIncrementalDraw }: RiffRe
           content: [
             {
               type: 'text',
-              text: `Here is a vector summary of the drawing:
+              text: `All new elements must be drawn using stroke colour ${selectedColor}.
+
+Here is a vector summary of the drawing:
 ${JSON.stringify(summary, null, 2)}
 
 Based on this analysis, please add creative elements that complement the existing drawing.
