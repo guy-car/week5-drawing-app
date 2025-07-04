@@ -62,109 +62,69 @@ Deliver a polished demo-ready drawing experience in the next 14 h that feels res
 ---
 
 ## Detailed implementation plan – Inline Bottom Toolbar
-1. **Scaffold component**  
-   • New: `components/BottomToolbar.tsx` (copy scaffold below).  
-   • Props: `color`, `setColor`, `strokeWidth`, `setStrokeWidth`, `isEraser`, `setIsEraser`.  
-   • Local state: `active` (`'color' | 'width' | null`) to track open pop-out.
 
-2. **Colour picker**  
-   • Phase 1: horizontal swatch list of 6–8 preset colours (`ColorSwatches.tsx`).  
-   • Auto-collapse after `onSelect`.  
-   • Leave extension point for wheel picker later (no extra libs yet).
+### Phase 1: Basic Structure with Color Picker
+1. **Initial Toolbar Setup**
+   • File(s): `components/BottomToolbar.tsx` (new), `App.tsx`
+   • Create basic toolbar with three buttons using Phosphor icons:
+     - "palette" for color picker
+     - "pencil-circle" for thickness (placeholder)
+     - "eraser" for eraser mode (placeholder)
+   • Style buttons similar to existing undo/redo buttons
+   • Position toolbar at bottom of screen with evenly spaced buttons
 
-3. **Thickness slider**  
-   • Use `@react-native-community/slider` (Expo default).  
-   • Vertical orientation (`transform: rotate(-90deg)`) to rise above icon.  
-   • Collapse on `onSlidingComplete`.
+2. **Color Picker Implementation**
+   • File(s): `components/ColorPicker.tsx` (new)
+   • Features:
+     - Color spectrum picker component
+     - Pops up above the toolbar when color button is pressed
+     - Recently used colors row (8 slots) - stretch goal
+   • State:
+     - Lift color state to App.tsx
+     - Track active state for picker visibility
 
-4. **Eraser toggle**  
-   • Toggles `isEraser` boolean.  
-   • Filled icon background when active; automatically unselect if user chooses a colour.
-
-5. **SafeArea & orientation**  
-   • Wrap toolbar with `SafeAreaView` and set `pointerEvents="box-none"`.  
-   • Lock portrait for demo:  
-     ```ts
-     import * as ScreenOrientation from 'expo-screen-orientation';
-     useEffect(() => {
-       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-     }, []);
+3. **State Management in App.tsx**
+   • Add new state:
+     ```typescript
+     const [currentColor, setCurrentColor] = useState('#000000');
+     const [activeControl, setActiveControl] = useState<'color' | 'thickness' | null>(null);
      ```
+   • Pass state and handlers to BottomToolbar
+   • Update DrawingCanvas to use selected color
 
-6. **State wiring**  
-   • Lift colour / width / eraser state to `App.tsx` (or small `DrawingContext`).
+### Phase 2 (Future)
+4. **Thickness Control**
+   • Implement slider for stroke width adjustment
+   • Range: -15% to +200% of default width
 
-7. **Regression checkpoints**  
-   1. Run jest (`npm test`) — all suites green.  
-   2. Manual smoke: draw → change colour → draw → undo/redo → toggle eraser → adjust width.  
-   3. Check gesture conflicts (drawing vs. toolbar).  
-   4. Minimum iPhone SE height: ensure pop-outs clear home indicator.
+5. **Eraser Mode**
+   • Toggle between drawing and erasing
+   • Use background color (#E6F3FF) for eraser strokes
 
-8. **Scaffold code**  
-   ```tsx
-// components/BottomToolbar.tsx
-import { useState } from 'react';
-import { View, TouchableOpacity, Animated } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import ColorSwatches from './ColorSwatches';
-import ThicknessSlider from './ThicknessSlider';
+### Implementation Notes
+- Skip SafeArea handling as orientation is locked
+- Match button styling with existing undo/redo buttons:
+  ```typescript
+  {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF'  // or contextual color
+  }
+  ```
+- Active state styling:
+  - Button background changes when control is active
+  - Consistent with current UI patterns
+- Testing Strategy:
+  - Manual testing of color picker interaction
+  - Verify color changes affect new strokes
+  - Check button layout and spacing
+  - Ensure picker closes on color selection
 
-export default function BottomToolbar({
-  color, setColor,
-  strokeWidth, setStrokeWidth,
-  isEraser, setIsEraser,
-}) {
-  const [active, setActive] = useState<'color' | 'width' | null>(null);
-
-  return (
-    <View style={styles.container} pointerEvents="box-none">
-      {/* Colour */}
-      <TouchableOpacity
-        onPress={() => setActive(active === 'color' ? null : 'color')}
-        style={[styles.icon, active === 'color' && styles.active]}
-      >
-        <Feather name="droplet" size={20} color={color} />
-      </TouchableOpacity>
-
-      {/* Thickness */}
-      <TouchableOpacity
-        onPress={() => setActive(active === 'width' ? null : 'width')}
-        style={[styles.icon, active === 'width' && styles.active]}
-      >
-        <Feather name="minus" size={20} color="#333" />
-      </TouchableOpacity>
-
-      {/* Eraser */}
-      <TouchableOpacity
-        onPress={() => setIsEraser(!isEraser)}
-        style={[styles.icon, isEraser && styles.selected]}
-      >
-        <Feather name="trash-2" size={20} color={isEraser ? '#fff' : '#333'} />
-      </TouchableOpacity>
-
-      {/* Pop-outs */}
-      {active === 'color' && (
-        <ColorSwatches
-          current={color}
-          onSelect={c => { setColor(c); setActive(null); }}
-        />
-      )}
-
-      {active === 'width' && (
-        <ThicknessSlider
-          value={strokeWidth}
-          onChange={setStrokeWidth}
-          onDone={() => setActive(null)}
-        />
-      )}
-    </View>
-  );
-}
-   ```
-
-9. **Stretch goals**  
-   • Landscape support: reposition toolbar to right edge when `width > height`.  
-   • Replace swatches with `react-native-color-picker` wheel if needed.
+### Dependencies
+- @phosphor-icons/react-native (to be added)
+- Existing style system for consistency
+- No additional UI framework dependencies
 
 ### Suggested order (remaining estimate)
 1. Clear-all confirm (0.2 h)  
