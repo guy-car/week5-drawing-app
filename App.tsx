@@ -215,7 +215,7 @@ export default function App() {
           >
             <Alien 
               size={32}
-              color="#2eff4d"
+              color={selectedColor === '#000000' ? '#2eff4d' : selectedColor}
               weight="fill"
             />
           </TouchableOpacity>
