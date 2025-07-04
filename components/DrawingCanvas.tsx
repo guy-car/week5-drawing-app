@@ -81,12 +81,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const aiPathRef = useRef<any>(null);
     
     const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
-    const initialScale = containerDimensions.width > 0 
-      ? Math.min(containerDimensions.width / BASE_CANVAS_SIZE, containerDimensions.height / BASE_CANVAS_SIZE) * 0.9 
-      : 0.5;
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
+
+    // Set initial scale when container dimensions are available
+    useEffect(() => {
+      if (containerDimensions.width > 0 && containerDimensions.height > 0) {
+        // Start at a zoom level that allows 3 zoom-outs to reach minimum
+        // MIN_ZOOM = 0.5, ZOOM_STEP = 0.25, so 3 steps = 0.5 + (3 × 0.25) = 1.25
+        const initialScale = MIN_ZOOM + (3 * ZOOM_STEP);
+        
+        // Only set if scale hasn't been changed by user yet
+        if (scale.value === 1) {
+          scale.value = initialScale;
+          onZoomChange(initialScale);
+        }
+      }
+    }, [containerDimensions]);
 
     // Add shared values to store the starting position when pan gesture begins
     const startTranslateX = useSharedValue(0);
@@ -111,7 +123,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         ? Math.min(scale.value + ZOOM_STEP, MAX_ZOOM)
         : Math.max(scale.value - ZOOM_STEP, MIN_ZOOM);
       
+      // Clamp current translation to new scale boundaries
+      const bounds = getPanBounds(newScale);
+      const clampedX = Math.max(-bounds.maxX, Math.min(bounds.maxX, translateX.value));
+      const clampedY = Math.max(-bounds.maxY, Math.min(bounds.maxY, translateY.value));
+      
       scale.value = withSpring(newScale);
+      translateX.value = withSpring(clampedX);
+      translateY.value = withSpring(clampedY);
       onZoomChange(newScale);
     };
 
@@ -226,6 +245,21 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const canUndo = () => undoStack.current.length > 0;
     const canRedo = () => redoStack.current.length > 0;
+
+    // Helper function to calculate pan boundaries based on current scale
+    const getPanBounds = (currentScale: number) => {
+      const scaledCanvas = BASE_CANVAS_SIZE * currentScale;
+      
+      // For horizontal: when zoomed in, allow more movement to explore the canvas
+      // When zoomed out, restrict movement since canvas fits in view
+      const horizontalOverflow = Math.max(0, scaledCanvas - containerDimensions.width);
+      const maxX = horizontalOverflow / 2 + (currentScale > 1 ? 200 : 50);
+      
+      // For vertical: your current setting works well
+      const maxY = Math.max(50, (scaledCanvas - containerDimensions.height) / 2 + 40);
+      
+      return { maxX, maxY };
+    };
 
     const undo = () => {
       if (!canUndo()) return;
@@ -405,8 +439,16 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       })
       .onUpdate((e) => {
         // Add gesture translation to the stored starting position
-        translateX.value = startTranslateX.value + e.translationX;
-        translateY.value = startTranslateY.value + e.translationY;
+        const newX = startTranslateX.value + e.translationX;
+        const newY = startTranslateY.value + e.translationY;
+        
+        // Apply pan boundaries to prevent canvas from going off-screen
+        const bounds = getPanBounds(scale.value);
+        const clampedX = Math.max(-bounds.maxX, Math.min(bounds.maxX, newX));
+        const clampedY = Math.max(-bounds.maxY, Math.min(bounds.maxY, newY));
+        
+        translateX.value = clampedX;
+        translateY.value = clampedY;
       })
       .runOnJS(true);
 
