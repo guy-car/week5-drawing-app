@@ -150,7 +150,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         onRequestClose={() => setShowWidthPicker(false)}
       >
         <TouchableOpacity 
-          style={styles.modalContainer} 
+          style={styles.widthModalContainer} 
           activeOpacity={1} 
           onPress={() => setShowWidthPicker(false)}
         >
@@ -167,7 +167,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                     { 
                       width: currentWidth,
                       height: currentWidth,
-                      borderRadius: currentWidth / 2
+                      borderRadius: currentWidth / 2,
+                      backgroundColor: color
                     }
                   ]} 
                 />
@@ -216,6 +217,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  widthModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 100,
   },
   pickerContainer: {
     backgroundColor: 'transparent',
