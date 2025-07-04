@@ -1,16 +1,3 @@
-/**
- * 🐛 DEBUG MODE: Extensive logging added to investigate color-related bugs
- * 
- * Look for these log patterns:
- * 🎯 STROKE START/MOVE - Tracks command accumulation per stroke
- * 🚨 CRITICAL BUG CHECK - Shows if ALL commands are captured per stroke (should only be current stroke)
- * 🚨 RENDER BUG - Shows path-stroke mapping failures (fallback to #000000)
- * 🤖 AI PATH - Shows AI stroke color handling
- * 🚨 INCREMENTAL AI - Shows incremental AI drawing issues (missing stroke entries)
- * ↩️↪️ UNDO/REDO - Shows undo/redo color preservation
- * 🧹 CLEAR - Shows canvas clearing behavior
- */
-
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Canvas, Path, Skia, Group, Rect, useCanvasRef } from '@shopify/react-native-skia';
@@ -250,13 +237,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const getPanBounds = (currentScale: number) => {
       const scaledCanvas = BASE_CANVAS_SIZE * currentScale;
       
-      // For horizontal: when zoomed in, allow more movement to explore the canvas
-      // When zoomed out, restrict movement since canvas fits in view
-      const horizontalOverflow = Math.max(0, scaledCanvas - containerDimensions.width);
-      const maxX = horizontalOverflow / 2 + (currentScale > 1 ? 200 : 50);
+      // Calculate how much the canvas overflows the container
+      const horizontalOverflow = scaledCanvas - containerDimensions.width;
+      const verticalOverflow = scaledCanvas - containerDimensions.height;
       
-      // For vertical: your current setting works well
-      const maxY = Math.max(50, (scaledCanvas - containerDimensions.height) / 2 + 40);
+      // MUCH more generous horizontal panning - allow seeing well beyond edges
+      const maxX = horizontalOverflow > 0 ? horizontalOverflow / 2 + 300 : 200;
+      // Keep vertical panning reasonable 
+      const maxY = verticalOverflow > 0 ? verticalOverflow / 2 + 40 : 50;
       
       return { maxX, maxY };
     };
@@ -533,7 +521,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
-    margin: 16,
+    marginVertical: 16,
+    marginHorizontal: 2,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
