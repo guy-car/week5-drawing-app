@@ -1,3 +1,11 @@
+// Ensure process.env exists before anything else
+if (typeof process === 'undefined') {
+  // @ts-ignore
+  global.process = { env: {} };
+} else if (!process.env) {
+  process.env = {};
+}
+
 // Silence warnings
 jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -45,4 +53,33 @@ jest.mock('react-native-reanimated', () => ({
   default: {
     View: 'View',
   },
-})); 
+}));
+
+// Mock react-native-sse (EventSource) to prevent runtime errors in tests
+jest.mock('react-native-sse', () => {
+  return {
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => ({
+      addEventListener: jest.fn(),
+      close: jest.fn(),
+    }))
+  };
+});
+
+// Provide a default global.fetch mock so tests that forget to stub fetch do not fail
+if (!global.fetch) {
+  global.fetch = jest.fn();
+}
+
+// Mock expo's env shim so Babel-transformed imports don't break under Jest
+// Must be registered BEFORE modules that import 'expo/virtual/env'
+jest.mock('expo/virtual/env', () => ({}), { virtual: true });
+
+// Ensure env object still exists (some mocks may have overwritten it)
+if (!process.env) {
+  process.env = {};
+}
+
+// Provide stable defaults for env flags referenced in code
+process.env.EXPO_PUBLIC_RIFF_ON_SKETCH = process.env.EXPO_PUBLIC_RIFF_ON_SKETCH || '0';
+process.env.DEBUG_STREAM = process.env.DEBUG_STREAM || '0'; 

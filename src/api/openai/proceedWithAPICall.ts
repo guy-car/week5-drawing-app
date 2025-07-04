@@ -19,9 +19,10 @@ class DrawingValidationError extends Error {
   }
 }
 
-export async function proceedWithAPICall(base64Image: string): Promise<DrawingCommands> {
+export async function proceedWithAPICall(base64Image: string, selectedColor: string): Promise<DrawingCommands> {
   console.log('🧪 Starting AI integration test...');
   console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
+  console.log('🎨 Using color:', selectedColor);
 
   // Step 1: Validate base64 image
   console.log('📸 Validating canvas image...');
@@ -48,7 +49,7 @@ export async function proceedWithAPICall(base64Image: string): Promise<DrawingCo
             content: [
               {
                 type: 'text',
-                text: expPrompt5
+                text: `All new elements must be drawn using stroke colour ${selectedColor}.\n\n${expPrompt5}`
               },
               {
                 type: 'image_url',
@@ -299,9 +300,10 @@ Based on your analysis, create commands for the specific new elements you descri
   }
 }
 
-export async function analyzeThenDrawWithContext(base64Image: string, existingCommands: DrawingCommand[]): Promise<DrawingCommands> {
-  console.log('🔍 Starting context-aware two-step AI analysis...');
+export async function analyzeThenDrawWithContext(base64Image: string, existingCommands: DrawingCommand[], selectedColor: string): Promise<DrawingCommands> {
+  console.log('🔍 Starting two-step AI analysis with context...');
   console.log('🔑 Using API key:', openaiConfig.apiKey?.substring(0, 10) + '...');
+  console.log('🎨 Using color:', selectedColor);
   console.log(`📊 Analyzing with ${existingCommands.length} existing drawing commands as context`);
 
   if (!base64Image) {
@@ -309,39 +311,8 @@ export async function analyzeThenDrawWithContext(base64Image: string, existingCo
   }
 
   try {
-    // STEP 1: Enhanced Vision + Command Context Analysis
-    console.log('📋 Step 1: Getting AI understanding (vision + command context analysis)...');
-    
-    // Create a summary of existing commands for context
-    const commandSummary = existingCommands.length > 0 
-      ? `\n\nEXISTING DRAWING COMMAND CONTEXT:
-The user has already drawn on this canvas using ${existingCommands.length} commands. Here are the drawing commands that created this image:
-
-${existingCommands.map((cmd: any, i) => {
-  switch (cmd.type) {
-    case 'moveTo':
-      return `${i + 1}. moveTo(${cmd.x}, ${cmd.y}) - Started drawing at position`;
-    case 'lineTo':
-      return `${i + 1}. lineTo(${cmd.x}, ${cmd.y}) - Drew line to position`;
-    case 'quadTo':
-      return `${i + 1}. quadTo(${cmd.x1}, ${cmd.y1}, ${cmd.x2}, ${cmd.y2}) - Drew curve via control point`;
-    case 'cubicTo':
-      return `${i + 1}. cubicTo(${cmd.x1}, ${cmd.y1}, ${cmd.x2}, ${cmd.y2}, ${cmd.x3}, ${cmd.y3}) - Drew cubic curve`;
-    case 'addCircle':
-      return `${i + 1}. addCircle(${cmd.cx}, ${cmd.cy}, r:${cmd.radius}) - Drew circle`;
-    default:
-      return `${i + 1}. ${cmd.type} - Unknown command`;
-  }
-}).join('\n')}
-
-This gives you EXACT insight into:
-- How the user draws (their scale preferences, coordinate ranges)
-- What stroke patterns they use
-- The typical size of elements they create
-- Their drawing style and approach
-
-Use this context to understand the existing drawing better and match the user's drawing style when adding new elements.`
-      : '\n\nNOTE: This is a blank canvas with no existing drawing commands.';
+    // STEP 1: Combined Vision + Intention Analysis
+    console.log('📋 Step 1: Getting AI understanding (vision + intention)...');
     
     const analysisResponse = await fetch(openaiConfig.baseUrl, {
       method: 'POST',
@@ -357,24 +328,18 @@ Use this context to understand the existing drawing better and match the user's 
             content: [
               {
                 type: 'text',
-                text: `Analyze this drawing on a 1000x1000 pixel canvas where (0,0) is top-left and (1000,1000) is bottom-right.${commandSummary}
+                text: `All new elements must be drawn using stroke colour ${selectedColor}.\n\nAnalyze this drawing on a 1000x1000 pixel canvas where (0,0) is top-left and (1000,1000) is bottom-right.
 
 Please provide:
 
 1. VISION: What do you see? Describe shapes, their approximate coordinates, and spatial relationships.
 
-2. COMMAND ANALYSIS: Based on the existing drawing commands:
-   - What scale does the user prefer? (look at coordinate ranges)
-   - What drawing patterns do they use? (moveTo/lineTo sequences, circle sizes, etc.)
-   - What's their typical stroke style?
-
-3. INTENTION: What would naturally complete or enhance this drawing? Be specific about:
-   - What you want to add
-   - Where it should go (approximate coordinates that match user's scale)
+2. INTENTION: What would naturally complete or enhance this drawing? Be specific about:
+   - What you want to add (using ${selectedColor} color)
+   - Where it should go (approximate coordinates)
    - Why this addition makes sense
-   - How it should match the user's existing drawing style
 
-Be detailed and specific about locations using the 1000x1000 coordinate system, and ensure your suggestions match the scale and style evident from the existing commands.`
+Be detailed and specific about locations using the 1000x1000 coordinate system.`
               },
               {
                 type: 'image_url',
@@ -383,7 +348,7 @@ Be detailed and specific about locations using the 1000x1000 coordinate system, 
             ]
           }
         ],
-        max_tokens: 1000
+        max_tokens: 800
       })
     });
 
