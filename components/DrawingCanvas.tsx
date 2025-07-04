@@ -1,16 +1,3 @@
-/**
- * 🐛 DEBUG MODE: Extensive logging added to investigate color-related bugs
- * 
- * Look for these log patterns:
- * 🎯 STROKE START/MOVE - Tracks command accumulation per stroke
- * 🚨 CRITICAL BUG CHECK - Shows if ALL commands are captured per stroke (should only be current stroke)
- * 🚨 RENDER BUG - Shows path-stroke mapping failures (fallback to #000000)
- * 🤖 AI PATH - Shows AI stroke color handling
- * 🚨 INCREMENTAL AI - Shows incremental AI drawing issues (missing stroke entries)
- * ↩️↪️ UNDO/REDO - Shows undo/redo color preservation
- * 🧹 CLEAR - Shows canvas clearing behavior
- */
-
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Canvas, Path, Skia, Group, Rect, useCanvasRef } from '@shopify/react-native-skia';
@@ -81,12 +68,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const aiPathRef = useRef<any>(null);
     
     const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
-    const initialScale = containerDimensions.width > 0 
-      ? Math.min(containerDimensions.width / BASE_CANVAS_SIZE, containerDimensions.height / BASE_CANVAS_SIZE) * 0.9 
-      : 0.5;
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
+
+    // Set initial scale when container dimensions are available
+    useEffect(() => {
+      if (containerDimensions.width > 0 && containerDimensions.height > 0) {
+        // Start at a zoom level that allows 3 zoom-outs to reach minimum
+        // MIN_ZOOM = 0.5, ZOOM_STEP = 0.25, so 3 steps = 0.5 + (3 × 0.25) = 1.25
+        const initialScale = MIN_ZOOM + (3 * ZOOM_STEP);
+        
+        // Only set if scale hasn't been changed by user yet
+        if (scale.value === 1) {
+          scale.value = initialScale;
+          onZoomChange(initialScale);
+        }
+      }
+    }, [containerDimensions]);
 
     // Add shared values to store the starting position when pan gesture begins
     const startTranslateX = useSharedValue(0);
@@ -111,7 +110,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         ? Math.min(scale.value + ZOOM_STEP, MAX_ZOOM)
         : Math.max(scale.value - ZOOM_STEP, MIN_ZOOM);
       
+      // Clamp current translation to new scale boundaries
+      const bounds = getPanBounds(newScale);
+      const clampedX = Math.max(-bounds.maxX, Math.min(bounds.maxX, translateX.value));
+      const clampedY = Math.max(-bounds.maxY, Math.min(bounds.maxY, translateY.value));
+      
       scale.value = withSpring(newScale);
+      translateX.value = withSpring(clampedX);
+      translateY.value = withSpring(clampedY);
       onZoomChange(newScale);
     };
 
@@ -226,6 +232,22 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     const canUndo = () => undoStack.current.length > 0;
     const canRedo = () => redoStack.current.length > 0;
+
+    // Helper function to calculate pan boundaries based on current scale
+    const getPanBounds = (currentScale: number) => {
+      const scaledCanvas = BASE_CANVAS_SIZE * currentScale;
+      
+      // Calculate how much the canvas overflows the container
+      const horizontalOverflow = scaledCanvas - containerDimensions.width;
+      const verticalOverflow = scaledCanvas - containerDimensions.height;
+      
+      // MUCH more generous horizontal panning - allow seeing well beyond edges
+      const maxX = horizontalOverflow > 0 ? horizontalOverflow / 2 + 300 : 200;
+      // Keep vertical panning reasonable 
+      const maxY = verticalOverflow > 0 ? verticalOverflow / 2 + 40 : 50;
+      
+      return { maxX, maxY };
+    };
 
     const undo = () => {
       if (!canUndo()) return;
@@ -405,8 +427,16 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       })
       .onUpdate((e) => {
         // Add gesture translation to the stored starting position
-        translateX.value = startTranslateX.value + e.translationX;
-        translateY.value = startTranslateY.value + e.translationY;
+        const newX = startTranslateX.value + e.translationX;
+        const newY = startTranslateY.value + e.translationY;
+        
+        // Apply pan boundaries to prevent canvas from going off-screen
+        const bounds = getPanBounds(scale.value);
+        const clampedX = Math.max(-bounds.maxX, Math.min(bounds.maxX, newX));
+        const clampedY = Math.max(-bounds.maxY, Math.min(bounds.maxY, newY));
+        
+        translateX.value = clampedX;
+        translateY.value = clampedY;
       })
       .runOnJS(true);
 
@@ -491,7 +521,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
-    margin: 16,
+    marginVertical: 16,
+    marginHorizontal: 2,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
