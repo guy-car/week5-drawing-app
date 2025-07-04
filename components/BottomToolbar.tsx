@@ -116,7 +116,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 sliderHidden={true}
                 autoResetSlider={true}
                 gapSize={30}
-                size={400}
               />
             </View>
           </TouchableOpacity>
