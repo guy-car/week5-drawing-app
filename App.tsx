@@ -207,7 +207,7 @@ export default function App() {
           >
             <Alien 
               size={32}
-              color="#FFFFFF"
+              color="#2eff4d"
               weight="fill"
             />
           </TouchableOpacity>
@@ -256,8 +256,6 @@ export default function App() {
           ref={canvasRef}
           mode={mode}
           onZoomChange={setZoom}
-          screenWidth={screenWidth}
-          screenHeight={screenHeight - 160}
           selectedColor={selectedColor}
         />
       </View>
@@ -377,14 +375,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   bottomToolbar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    paddingVertical: 8,
+    paddingVertical: 16,
     paddingHorizontal: 16,
   },
   modalContainer: {

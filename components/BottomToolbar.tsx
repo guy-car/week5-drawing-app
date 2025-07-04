@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import ColorPicker from 'react-native-wheel-color-picker';
-import { Palette } from 'phosphor-react-native';
+import { Palette, Eraser, PencilCircle, DownloadSimple } from 'phosphor-react-native';
 
 interface BottomToolbarProps {
   color: string;
@@ -13,11 +13,36 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({ color, onColorChange }) =
   
   return (
     <View style={styles.container}>
+      {/* Eraser Button */}
       <TouchableOpacity
-        style={[styles.colorButton, { backgroundColor: color }]}
+        style={[styles.toolButton, styles.inactiveButton]}
+        onPress={() => {}}
+      >
+        <Eraser color="#000000" size={28} />
+      </TouchableOpacity>
+
+      {/* Color Picker Button */}
+      <TouchableOpacity
+        style={[styles.toolButton, styles.inactiveButton]}
         onPress={() => setShowColorPicker(true)}
       >
-        <Palette color="#e0e0e0"  size={28} />
+        <Palette color={color} size={28} />
+      </TouchableOpacity>
+
+      {/* Pencil Button */}
+      <TouchableOpacity
+        style={[styles.toolButton, styles.inactiveButton]}
+        onPress={() => {}}
+      >
+        <PencilCircle color="#000000" size={28} />
+      </TouchableOpacity>
+
+      {/* Download Button */}
+      <TouchableOpacity
+        style={[styles.toolButton, styles.inactiveButton]}
+        onPress={() => {}}
+      >
+        <DownloadSimple color="#000000" size={28} />
       </TouchableOpacity>
 
       <Modal
@@ -62,17 +87,21 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
+    justifyContent: 'space-evenly',
+    height: 60,
   },
-  colorButton: {
+  toolButton: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  activeButton: {
+    backgroundColor: '#000000',
+  },
+  inactiveButton: {
+    backgroundColor: '#e0e0e0',
   },
   modalContainer: {
     flex: 1,

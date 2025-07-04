@@ -35,8 +35,6 @@ const ZOOM_STEP = 0.25;
 interface DrawingCanvasProps {
   mode: 'draw' | 'pan';
   onZoomChange: (zoom: number) => void;
-  screenWidth: number;
-  screenHeight: number;
   selectedColor: string;
 }
 
@@ -71,7 +69,7 @@ interface Stroke {
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  ({ mode, onZoomChange, screenWidth, screenHeight, selectedColor }, ref) => {
+  ({ mode, onZoomChange, selectedColor }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
@@ -82,7 +80,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const canvasRef = useCanvasRef();
     const aiPathRef = useRef<any>(null);
     
-    const initialScale = Math.min(screenWidth / BASE_CANVAS_SIZE, screenHeight / BASE_CANVAS_SIZE) * 0.9;
+    const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
+    const initialScale = containerDimensions.width > 0 
+      ? Math.min(containerDimensions.width / BASE_CANVAS_SIZE, containerDimensions.height / BASE_CANVAS_SIZE) * 0.9 
+      : 0.5;
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
@@ -463,19 +464,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     return (
       <View style={styles.container}>
         <View 
-          style={[styles.canvasContainer, {
-            width: screenWidth * 0.9,
-            height: screenHeight * 0.8,
-            overflow: 'hidden',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }]}
+          style={styles.canvasContainer}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setContainerDimensions({ width, height });
+          }}
         >
           <GestureDetector gesture={mode === 'pan' ? panGesture : Gesture.Tap()}>
-            <Animated.View style={[styles.gestureContainer, animatedStyle, {
-              alignItems: 'center',
-              justifyContent: 'center'
-            }]}>
+            <Animated.View style={[styles.gestureContainer, animatedStyle]}>
               {canvasContent}
             </Animated.View>
           </GestureDetector>
@@ -492,8 +488,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   canvasContainer: {
+    flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
+    margin: 16,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gestureContainer: {
     alignItems: 'center',
