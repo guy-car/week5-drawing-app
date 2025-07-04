@@ -207,7 +207,7 @@ export default function App() {
           >
             <Alien 
               size={32}
-              color="#FFFFFF"
+              color="#2eff4d"
               weight="fill"
             />
           </TouchableOpacity>
@@ -257,13 +257,13 @@ export default function App() {
           mode={mode}
           onZoomChange={setZoom}
           screenWidth={screenWidth}
-          screenHeight={screenHeight - 160}
+          screenHeight={screenHeight - 200}
           selectedColor={selectedColor}
         />
       </View>
 
       {/* Bottom Toolbar */}
-      <View style={styles.bottomToolbar}>
+      <View style={styles.bottomToolbar} pointerEvents="box-none">
         <BottomToolbar
           color={selectedColor}
           onColorChange={setSelectedColor}
@@ -378,13 +378,13 @@ const styles = StyleSheet.create({
   },
   bottomToolbar: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 20,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    paddingVertical: 8,
+    paddingVertical: 16,
     paddingHorizontal: 16,
   },
   modalContainer: {
