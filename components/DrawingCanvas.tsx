@@ -23,6 +23,7 @@ interface DrawingCanvasProps {
   mode: 'draw' | 'pan';
   onZoomChange: (zoom: number) => void;
   selectedColor: string;
+  onModeChange?: (mode: 'draw' | 'pan') => void;
 }
 
 interface DrawingCanvasRef {
@@ -56,7 +57,7 @@ interface Stroke {
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  ({ mode, onZoomChange, selectedColor }, ref) => {
+  ({ mode, onZoomChange, selectedColor, onModeChange }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
@@ -288,6 +289,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         console.log('🧹 CLEAR - Before: paths:', paths.length, 'strokes:', strokes.length, 'userCommands:', userCommands.length);
         console.log('🧹 CLEAR - Current selectedColor remains:', selectedColor);
         
+        // Clear all drawing state
         setPaths([]);
         setStrokes([]);
         setCurrentPath(null);
@@ -296,7 +298,19 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         redoStack.current = [];
         aiPathRef.current = null;
         
-        console.log('🧹 CLEAR - Canvas cleared, selectedColor preserved');
+        // Reset zoom to initial level and recenter canvas
+        const initialScale = MIN_ZOOM + (3 * ZOOM_STEP); // 1.25
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        scale.value = withSpring(initialScale);
+        onZoomChange(initialScale);
+        
+        // Reset mode to draw
+        if (onModeChange) {
+          onModeChange('draw');
+        }
+        
+        console.log('🧹 CLEAR - Canvas cleared, zoom reset to:', initialScale, 'position reset to center, mode reset to draw');
       },
       handleZoom,
       exportCanvas: () => exportCanvas(canvasRef, { resize: 256, format: 'jpeg', quality: 0.6 }),

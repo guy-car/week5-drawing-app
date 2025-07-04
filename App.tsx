@@ -37,12 +37,18 @@ interface DrawingCanvasRef {
 
 export default function App() {
   const [mode, setMode] = useState<'draw' | 'pan'>('draw');
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1.25); // Match initial zoom level from DrawingCanvas
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [canvasEmpty, setCanvasEmpty] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#000000');
   const canvasRef = useRef<DrawingCanvasRef>(null);
+  
+  // Zoom button state
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 3;
+  const canZoomIn = zoom < MAX_ZOOM;
+  const canZoomOut = zoom > MIN_ZOOM;
 
   // Poll canvas empty state
   useEffect(() => {
@@ -227,22 +233,24 @@ export default function App() {
 
           <View style={styles.buttonGroup}>
             <TouchableOpacity 
-              style={[styles.iconButton, styles.activeButton]} 
+              style={[styles.iconButton, canZoomOut && styles.activeButton, !canZoomOut && styles.disabledButton]} 
               onPress={() => handleZoom(false)}
+              disabled={!canZoomOut}
             >
               <MagnifyingGlassMinus
                 size={24}
-                color="#FFFFFF"
+                color={canZoomOut ? "#FFFFFF" : "#666666"}
                 weight="bold"
               />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.iconButton, styles.activeButton]} 
+              style={[styles.iconButton, canZoomIn && styles.activeButton, !canZoomIn && styles.disabledButton]} 
               onPress={() => handleZoom(true)}
+              disabled={!canZoomIn}
             >
               <MagnifyingGlassPlus
                 size={24}
-                color="#FFFFFF"
+                color={canZoomIn ? "#FFFFFF" : "#666666"}
                 weight="bold"
               />
             </TouchableOpacity>
@@ -257,6 +265,7 @@ export default function App() {
           mode={mode}
           onZoomChange={setZoom}
           selectedColor={selectedColor}
+          onModeChange={setMode}
         />
       </View>
 
