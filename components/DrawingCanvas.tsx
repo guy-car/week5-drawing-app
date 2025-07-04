@@ -169,7 +169,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           path: aiPath, 
           commands,
           color: selectedColor,  // Use current selected color for AI strokes
-          strokeWidth: 2
+          strokeWidth: strokeWidthRef.current // Use current stroke width instead of hardcoded 2
         };
 
         console.log('🤖 AI PATH - Created stroke with color:', stroke.color);
@@ -228,7 +228,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         setStrokes(prev => {
           const existingStroke = prev.find(s => s.path === aiPathRef.current);
           if (!existingStroke) {
-            return [...prev, { path: aiPathRef.current, commands: [], color: selectedColor, strokeWidth: 2 }];
+            return [...prev, { 
+              path: aiPathRef.current, 
+              commands: [], 
+              color: selectedColor, 
+              strokeWidth: strokeWidthRef.current // Use current stroke width instead of hardcoded 2
+            }];
           }
 
           return prev;
