@@ -256,14 +256,12 @@ export default function App() {
           ref={canvasRef}
           mode={mode}
           onZoomChange={setZoom}
-          screenWidth={screenWidth}
-          screenHeight={screenHeight - 200}
           selectedColor={selectedColor}
         />
       </View>
 
       {/* Bottom Toolbar */}
-      <View style={styles.bottomToolbar} pointerEvents="box-none">
+      <View style={styles.bottomToolbar}>
         <BottomToolbar
           color={selectedColor}
           onColorChange={setSelectedColor}
@@ -377,10 +375,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   bottomToolbar: {
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
     backgroundColor: 'transparent',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
