@@ -116,6 +116,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 sliderHidden={true}
                 autoResetSlider={true}
                 gapSize={30}
+                size={400}
               />
             </View>
           </TouchableOpacity>
@@ -152,11 +153,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pickerContainer: {
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
     padding: 20,
     borderRadius: 10,
-    width: 300,
-    maxWidth: '90%',
+    width: 400,
+    maxWidth: '100%',
   },
 });
 
