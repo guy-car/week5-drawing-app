@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { Palette, Eraser, PencilCircle, DownloadSimple } from 'phosphor-react-native';
@@ -6,25 +6,67 @@ import { Palette, Eraser, PencilCircle, DownloadSimple } from 'phosphor-react-na
 interface BottomToolbarProps {
   color: string;
   onColorChange: (color: string) => void;
+  backgroundColor?: string;
+  onToolChange?: (tool: 'draw' | 'erase') => void;
+  onStrokeWidthChange?: (width: number) => void;
+  defaultStrokeWidth?: number;
 }
 
-const BottomToolbar: React.FC<BottomToolbarProps> = ({ color, onColorChange }) => {
+const ERASER_WIDTH = 48;
+const DEFAULT_DRAW_WIDTH = 2;
+
+const BottomToolbar: React.FC<BottomToolbarProps> = ({ 
+  color, 
+  onColorChange,
+  backgroundColor = "#E6F3FF",
+  onToolChange,
+  onStrokeWidthChange,
+  defaultStrokeWidth = DEFAULT_DRAW_WIDTH
+}) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [activeTool, setActiveTool] = useState<'draw' | 'erase'>('draw');
+  const lastDrawWidth = useRef(defaultStrokeWidth);
+  
+  const handleToolChange = (newTool: 'draw' | 'erase') => {
+    const nextTool = activeTool === newTool ? 'draw' : newTool;
+    setActiveTool(nextTool);
+    if (onToolChange) onToolChange(nextTool);
+    if (nextTool === 'erase') {
+      lastDrawWidth.current = defaultStrokeWidth; // remember current draw width
+      if (onStrokeWidthChange) onStrokeWidthChange(ERASER_WIDTH);
+    } else {
+      if (onStrokeWidthChange) onStrokeWidthChange(lastDrawWidth.current);
+    }
+  };
   
   return (
     <View style={styles.container}>
       {/* Eraser Button */}
       <TouchableOpacity
-        style={[styles.toolButton, styles.inactiveButton]}
-        onPress={() => {}}
+        style={[
+          styles.toolButton,
+          activeTool === 'erase' ? styles.activeButton : styles.inactiveButton
+        ]}
+        onPress={() => handleToolChange('erase')}
       >
-        <Eraser color="#000000" size={28} />
+        <Eraser 
+          color={activeTool === 'erase' ? "#FFFFFF" : "#000000"} 
+          size={28} 
+        />
       </TouchableOpacity>
 
       {/* Color Picker Button */}
       <TouchableOpacity
-        style={[styles.toolButton, styles.inactiveButton]}
-        onPress={() => setShowColorPicker(true)}
+        style={[
+          styles.toolButton,
+          styles.inactiveButton // Always use inactive style for color picker
+        ]}
+        onPress={() => {
+          if (activeTool === 'erase') {
+            handleToolChange('draw');  // Switch back to draw mode
+          }
+          setShowColorPicker(true);
+        }}
       >
         <Palette color={color} size={28} />
       </TouchableOpacity>

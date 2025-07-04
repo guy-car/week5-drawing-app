@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Canvas, Path, Skia, Group, Rect, useCanvasRef } from '@shopify/react-native-skia';
+import { Canvas, Path, Skia, Group, Rect, useCanvasRef, Circle } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { 
   useSharedValue,
@@ -24,6 +24,9 @@ interface DrawingCanvasProps {
   onZoomChange: (zoom: number) => void;
   selectedColor: string;
   onModeChange?: (mode: 'draw' | 'pan') => void;
+  backgroundColor?: string;
+  tool?: 'draw' | 'erase';
+  strokeWidth?: number;
 }
 
 interface DrawingCanvasRef {
@@ -47,6 +50,8 @@ interface PathWithData {
   startY: number;
   points: [number, number][];
   color: string;
+  strokeWidth?: number;
+  isEraser?: boolean;
 }
 
 // ----- Undo/Redo -----
@@ -54,10 +59,12 @@ interface Stroke {
   path: any;                        // Skia.Path
   commands: DrawingCommand[];       // for export
   color: string;                    // stroke color
+  strokeWidth?: number;
+  isEraser?: boolean;
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  ({ mode, onZoomChange, selectedColor, onModeChange }, ref) => {
+  ({ mode, onZoomChange, selectedColor, onModeChange, backgroundColor, tool = 'draw', strokeWidth = 2 }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
@@ -161,7 +168,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         const stroke: Stroke = { 
           path: aiPath, 
           commands,
-          color: selectedColor  // Use current selected color for AI strokes
+          color: selectedColor,  // Use current selected color for AI strokes
+          strokeWidth: 2
         };
 
         console.log('🤖 AI PATH - Created stroke with color:', stroke.color);
@@ -220,7 +228,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         setStrokes(prev => {
           const existingStroke = prev.find(s => s.path === aiPathRef.current);
           if (!existingStroke) {
-            return [...prev, { path: aiPathRef.current, commands: [], color: selectedColor }];
+            return [...prev, { path: aiPathRef.current, commands: [], color: selectedColor, strokeWidth: 2 }];
           }
 
           return prev;
@@ -335,6 +343,19 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       };
     });
 
+    const toolRef = useRef(tool);
+    useEffect(()=>{ toolRef.current = tool; }, [tool]);
+
+    const strokeWidthRef = useRef(strokeWidth);
+    useEffect(()=>{ strokeWidthRef.current = strokeWidth; }, [strokeWidth]);
+
+    const [cursorPos, setCursorPos] = useState<{x:number, y:number}>({ x: -1000, y: -1000 });
+    const [cursorRadius, setCursorRadius] = useState(strokeWidth / 2);
+
+    useEffect(() => {
+      setCursorRadius(strokeWidth / 2);
+    }, [strokeWidth]);
+
     const onTouchStart = (event: any) => {
       if (mode !== 'draw') return;
 
@@ -342,92 +363,76 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       const { locationX, locationY } = touch;
       
       if (locationX !== undefined && locationY !== undefined) {
-        // Convert screen coordinates to canvas coordinates
         const canvasCoords = screenToCanvas(locationX, locationY);
-        
-        // Create new path with color
         const path = Skia.Path.Make();
         path.moveTo(canvasCoords.x, canvasCoords.y);
+
+        const isEraser = toolRef.current === 'erase';
+        const pathColor = isEraser ? '#000000' : selectedColor; // color irrelevant for eraser
+        const width = strokeWidthRef.current;
 
         setCurrentPath({
           path,
           startX: canvasCoords.x,
           startY: canvasCoords.y,
           points: [[canvasCoords.x, canvasCoords.y]],
-          color: selectedColor
+          color: pathColor,
+          strokeWidth: width,
+          isEraser,
         });
 
-        // Add moveTo command
-        setUserCommands(prev => {
-          const newCommands = [...prev, {
-            type: 'moveTo' as const,
-            x: Math.round(canvasCoords.x),
-            y: Math.round(canvasCoords.y)
-          }];
-          return newCommands;
-        });
+        if (isEraser) {
+          setCursorPos({ x: canvasCoords.x, y: canvasCoords.y });
+        } else {
+          setCursorPos({ x: -1000, y: -1000 });
+        }
+
+        if(!isEraser){
+          setUserCommands(prev => [...prev, { type:'moveTo', x: Math.round(canvasCoords.x), y: Math.round(canvasCoords.y) }]);
+        }
       }
     };
 
-    const onTouchMove = (event: any) => {
+    const onTouchMove = (event:any)=>{
       if (mode !== 'draw' || !currentPath) return;
-
-      const touch = event.nativeEvent;
+      const touch=event.nativeEvent;
       const { locationX, locationY } = touch;
-
-      if (locationX !== undefined && locationY !== undefined) {
-        // Convert screen coordinates to canvas coordinates
+      if (locationX!==undefined&&locationY!==undefined){
         const canvasCoords = screenToCanvas(locationX, locationY);
         const roundedX = Math.round(canvasCoords.x);
         const roundedY = Math.round(canvasCoords.y);
-
-        // Update path
         currentPath.path.lineTo(roundedX, roundedY);
-        
-        // Update current path data
-        setCurrentPath({
-          path: currentPath.path,
-          startX: currentPath.startX,
-          startY: currentPath.startY,
-          points: [...currentPath.points, [roundedX, roundedY]],
-          color: currentPath.color
-        });
-
-        // Add lineTo command
-        setUserCommands(prev => {
-          const newCommands = [...prev, {
-            type: 'lineTo' as const,
-            x: roundedX,
-            y: roundedY
-          }];
-          return newCommands;
-        });
+        setCurrentPath({ ...currentPath, points:[...currentPath.points,[roundedX,roundedY]] });
+        if (currentPath.isEraser) {
+          setCursorPos({ x: roundedX, y: roundedY });
+        }
+        if(!currentPath.isEraser){
+          setUserCommands(prev=>[...prev,{type:'lineTo',x:roundedX,y:roundedY}]);
+        }
       }
     };
 
     const onTouchEnd = () => {
-      if (currentPath) {
-        
+      if (currentPath){
         const stroke: Stroke = {
           path: currentPath.path,
-          commands: [...userCommands], // ❌ POTENTIAL BUG: capturing ALL commands
-          color: currentPath.color
+          commands: currentPath.isEraser ? [] : [...userCommands],
+          color: currentPath.color,
+          strokeWidth: currentPath.strokeWidth,
+          isEraser: currentPath.isEraser
         };
-        
-        setStrokes(prev => {
-          const newStrokes = [...prev, stroke];
-          return newStrokes;
-        });
-        setPaths(prev => {
-          const newPaths = [...prev, currentPath.path];
-          return newPaths;
-        });
-        
+        setStrokes(prev=>[...prev,stroke]);
+        setPaths(prev=>[...prev,currentPath.path]);
         undoStack.current.push(stroke);
-        redoStack.current = [];
-        if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
-        
+        redoStack.current=[];
+        if (undoStack.current.length>MAX_HISTORY) undoStack.current.shift();
         setCurrentPath(null);
+        if(!currentPath.isEraser){
+          setUserCommands([]);
+        }
+
+        // hide cursor when lift finger
+        setCursorPos({ x: -1000, y: -1000 });
       }
     };
 
@@ -471,37 +476,65 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             y={0}
             width={BASE_CANVAS_SIZE}
             height={BASE_CANVAS_SIZE}
-            color="#E6F3FF"
+            color={backgroundColor || "#E6F3FF"}
           />
-          {paths.map((path, index) => {
-            const matchingStroke = strokes.find(stroke => stroke.path === path);
-            
-            // Log path-stroke mapping issues
-            if (!matchingStroke) {
-              console.log('🚨 RENDER BUG - No matching stroke found for path index:', index);
-              console.log('  🎯 Total paths:', paths.length, 'Total strokes:', strokes.length);
-              console.log('  🚨 Using fallback color #000000');
-            }
-            
-            return (
-              <Path
-                key={index}
-                path={path}
-                color={matchingStroke ? matchingStroke.color : '#000000'}
-                style="stroke"
-                strokeWidth={2}
-              />
-            );
-          })}
-          {currentPath && (
-            <Path
-              path={currentPath.path}
-              color={currentPath.color}
-              style="stroke"
-              strokeWidth={2}
-            />
-          )}
+          {/* Strokes isolated in their own layer so eraser clears strokes only */}
+          <Group layer>
+            {paths.map((path, index) => {
+              const matchingStroke = strokes.find(s => s.path === path);
+              if (!matchingStroke) return null;
+              if (matchingStroke.isEraser) {
+                return (
+                  <Path
+                    key={index}
+                    path={path}
+                    style="stroke"
+                    strokeWidth={matchingStroke.strokeWidth}
+                    blendMode="clear"
+                  />
+                );
+              }
+              return (
+                <Path
+                  key={index}
+                  path={path}
+                  color={matchingStroke.color}
+                  style="stroke"
+                  strokeWidth={matchingStroke.strokeWidth}
+                />
+              );
+            })}
+            {currentPath && (
+              currentPath.isEraser ? (
+                <Path
+                  path={currentPath.path}
+                  style="stroke"
+                  strokeWidth={currentPath.strokeWidth}
+                  blendMode="clear"
+                />
+              ) : (
+                <Path
+                  path={currentPath.path}
+                  color={currentPath.color}
+                  style="stroke"
+                  strokeWidth={currentPath.strokeWidth}
+                />
+              )
+            )}
+          </Group>
         </Group>
+
+        {/* Eraser cursor preview */}
+        {toolRef.current === 'erase' && (
+          <Circle
+            cx={cursorPos.x}
+            cy={cursorPos.y}
+            r={cursorRadius}
+            color="rgba(0,0,0,0.25)"
+            style="stroke"
+            strokeWidth={1}
+          />
+        )}
       </Canvas>
     );
 
