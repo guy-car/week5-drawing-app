@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Modal from 'react-native-modal';
+import { Alien, MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowUDownLeft, ArrowUDownRight } from 'phosphor-react-native';
 import DrawingCanvas from './components/DrawingCanvas';
 import { analyzeThenDrawWithContext } from './src/api/openai';
 import { riffOnSketch } from './src/api/openai/riffOnSketch';
@@ -11,6 +12,8 @@ import { vectorSummary } from './src/utils/vectorSummary';
 import { streamLog } from './src/api/openai/config';
 import { stamp, printPerf } from './src/utils/performance';
 import BottomToolbar from './components/BottomToolbar';
+import LinearGradient from 'react-native-linear-gradient';
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -158,71 +161,93 @@ export default function App() {
       
       {/* Header Controls */}
       <View style={styles.header}>
-        <View style={styles.leftControls}>
+        {/* Left Column */}
+        <View style={styles.column}>
           <TouchableOpacity 
             style={[styles.button, mode === 'draw' && styles.activeButton]} 
             onPress={toggleMode}
           >
             <Text style={[styles.buttonText, mode === 'draw' && styles.activeButtonText]}>
-              {mode === 'draw' ? 'Draw' : 'Move'}
+              {mode === 'draw' ? 'Move' : 'Draw'}
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity 
+              style={[styles.iconButton, canUndo && styles.activeButton, !canUndo && styles.disabledButton]} 
+              onPress={handleUndo}
+              disabled={!canUndo}
+            >
+              <ArrowUDownLeft
+                size={24}
+                color={canUndo ? "#FFFFFF" : "#666666"}
+                weight="bold"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.iconButton, canRedo && styles.activeButton, !canRedo && styles.disabledButton]} 
+              onPress={handleRedo}
+              disabled={!canRedo}
+            >
+              <ArrowUDownRight
+                size={24}
+                color={canRedo ? "#FFFFFF" : "#666666"}
+                weight="bold"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.zoomControls}>
+        {/* Center Column */}
+        <View style={styles.column}>
           <TouchableOpacity 
-            style={[styles.zoomButton, styles.marginLeft]} 
-            onPress={() => handleZoom(false)}
+            style={[styles.aiButton, isTestingAI && styles.disabledButton]} 
+            onPress={proceedWithAPICallHandler}
+            disabled={isTestingAI}
           >
-            <Text style={styles.zoomButtonText}>-</Text>
-          </TouchableOpacity>
-          <Text style={styles.zoomText}>{zoom.toFixed(1)}x</Text>
-          <TouchableOpacity 
-            style={styles.zoomButton} 
-            onPress={() => handleZoom(true)}
-          >
-            <Text style={styles.zoomButtonText}>+</Text>
+            <Alien 
+              size={32}
+              color="#FFFFFF"
+              weight="fill"
+            />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.rightControls}>
+        {/* Right Column */}
+        <View style={styles.column}>
           <TouchableOpacity 
-            style={[styles.clearButton, canvasEmpty && styles.disabledButton]} 
+            style={[styles.button, canvasEmpty && styles.disabledButton]} 
             onPress={handleClear}
             disabled={canvasEmpty}
           >
-            <Text style={[styles.clearButtonText, canvasEmpty && styles.disabledButtonText]}>Clear</Text>
+            <Text style={[styles.buttonText, canvasEmpty && { opacity: 0.5 }]}>
+              Clear
+            </Text>
           </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* AI Button and History Controls */}
-      <View style={styles.aiTestContainer}>
-        <View style={styles.historyControls}>
-          <TouchableOpacity 
-            style={[styles.undoButton, !canUndo && styles.disabledButton]} 
-            onPress={handleUndo}
-            disabled={!canUndo}
-          >
-            <Text style={[styles.buttonText, !canUndo && styles.disabledButtonText]}>↩</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.redoButton, !canRedo && styles.disabledButton]} 
-            onPress={handleRedo}
-            disabled={!canRedo}
-          >
-            <Text style={[styles.buttonText, !canRedo && styles.disabledButtonText]}>↪</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity 
+              style={[styles.iconButton, styles.activeButton]} 
+              onPress={() => handleZoom(false)}
+            >
+              <MagnifyingGlassMinus
+                size={24}
+                color="#FFFFFF"
+                weight="bold"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.iconButton, styles.activeButton]} 
+              onPress={() => handleZoom(true)}
+            >
+              <MagnifyingGlassPlus
+                size={24}
+                color="#FFFFFF"
+                weight="bold"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-        <TouchableOpacity 
-          style={[styles.aiTestButton, isTestingAI && styles.aiTestButtonDisabled]} 
-          onPress={proceedWithAPICallHandler}
-          disabled={isTestingAI}
-        >
-          <Text style={styles.aiTestButtonText}>
-            {isTestingAI ? '🧪 Processing...' : '🤖 AI Draw'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Canvas */}
@@ -283,143 +308,89 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    paddingTop: 50,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    paddingTop: 50,
+    paddingBottom: 10,
   },
-  leftControls: {
+  column: {
     flex: 1,
-  },
-  rightControls: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  zoomControls: {
-    flexDirection: 'row',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
+    paddingVertical: 10,
+    gap: 8,
   },
   button: {
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#e0e0e0',
-    alignSelf: 'flex-start',
+    minWidth: 80,
+    alignItems: 'center',
   },
   activeButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: 'black',
   },
   buttonText: {
-    fontSize: 14,
+    color: '#000000',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   activeButtonText: {
-    color: '#fff',
+    color: '#ffffff',
   },
-  zoomButton: {
-    width: 30,
-    height: 30,
-    backgroundColor: '#007AFF',
-    borderRadius: 15,
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  marginLeft: {
-    marginLeft: 15,
-  },
-  zoomButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  zoomText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    minWidth: 50,
-    textAlign: 'center',
-    marginHorizontal: 10,
-  },
-  clearButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#fc6d6d',
-  },
-  clearButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  aiTestContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  aiTestButton: {
-    backgroundColor: '#28a745',
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  aiTestButtonDisabled: {
-    backgroundColor: '#6c757d',
-  },
-  aiTestButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  canvasContainer: {
-    flex: 1,
-    backgroundColor: '#ffff',
-  },
-  historyControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  undoButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
-    marginRight: 8,
-  },
-  redoButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
-    marginLeft: 8,
   },
   disabledButton: {
     backgroundColor: '#e0e0e0',
+    opacity: 0.5,
   },
-  disabledButtonText: {
-    color: '#999',
-  },
-  modalContainer: {
+  aiButton: {
+    width: 80,
+    height: 80,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'black',
+    borderRadius: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  canvasContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  bottomToolbar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 8,
   },
   modalCard: { 
     width: 280, 
@@ -469,16 +440,5 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: '600',
     fontSize: 16
-  },
-  bottomToolbar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
   },
 }); 
