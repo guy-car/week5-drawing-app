@@ -42,6 +42,8 @@ export default function App() {
   const [canvasEmpty, setCanvasEmpty] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#000000');
+  const [activeTool, setActiveTool] = useState<'draw' | 'erase'>('draw');
+  const [strokeWidth, setStrokeWidth] = useState(2);
   const canvasRef = useRef<DrawingCanvasRef>(null);
   
   // Zoom button state
@@ -266,6 +268,9 @@ export default function App() {
           onZoomChange={setZoom}
           selectedColor={selectedColor}
           onModeChange={setMode}
+          backgroundColor="#E6F3FF"
+          tool={activeTool}
+          strokeWidth={strokeWidth}
         />
       </View>
 
@@ -274,6 +279,10 @@ export default function App() {
         <BottomToolbar
           color={selectedColor}
           onColorChange={setSelectedColor}
+          backgroundColor="#E6F3FF"
+          onToolChange={setActiveTool}
+          onStrokeWidthChange={setStrokeWidth}
+          defaultStrokeWidth={strokeWidth}
         />
       </View>
 
