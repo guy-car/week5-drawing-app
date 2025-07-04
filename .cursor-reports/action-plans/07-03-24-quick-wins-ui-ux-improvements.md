@@ -71,14 +71,18 @@ Deliver a polished demo-ready drawing experience in the next 14 h that feels res
      - "pencil-circle" for thickness (placeholder)
      - "eraser" for eraser mode (placeholder)
    • Style buttons similar to existing undo/redo buttons
-   • Position toolbar at bottom of screen with evenly spaced buttons
+   • Position:
+     - Fixed at absolute bottom of screen
+     - Same level as existing bottom panel
+     - Evenly spaced buttons within toolbar
+     - Canvas automatically fills space between top and bottom panels
 
 2. **Color Picker Implementation**
    • File(s): `components/ColorPicker.tsx` (new)
    • Features:
-     - Color spectrum picker component
+     - Use react-native-color-picker's triangle/wheel picker component
      - Pops up above the toolbar when color button is pressed
-     - Recently used colors row (8 slots) - stretch goal
+     - Returns hex color value (#RRGGBB format)
    • State:
      - Lift color state to App.tsx
      - Track active state for picker visibility
@@ -91,15 +95,6 @@ Deliver a polished demo-ready drawing experience in the next 14 h that feels res
      ```
    • Pass state and handlers to BottomToolbar
    • Update DrawingCanvas to use selected color
-
-### Phase 2 (Future)
-4. **Thickness Control**
-   • Implement slider for stroke width adjustment
-   • Range: -15% to +200% of default width
-
-5. **Eraser Mode**
-   • Toggle between drawing and erasing
-   • Use background color (#E6F3FF) for eraser strokes
 
 ### Implementation Notes
 - Skip SafeArea handling as orientation is locked
@@ -120,6 +115,27 @@ Deliver a polished demo-ready drawing experience in the next 14 h that feels res
   - Verify color changes affect new strokes
   - Check button layout and spacing
   - Ensure picker closes on color selection
+
+### Dependencies
+- @phosphor-icons/react-native (to be added)
+- react-native-color-picker (to be added)
+- Existing style system for consistency
+
+### Estimated Time
+- Toolbar setup: 15 min
+- Color picker integration: 30 min
+- State management: 15 min
+- Testing: 15 min
+Total: ~75 min
+
+### Phase 2 (Future)
+4. **Thickness Control**
+   • Implement slider for stroke width adjustment
+   • Range: -15% to +200% of default width
+
+5. **Eraser Mode**
+   • Toggle between drawing and erasing
+   • Use background color (#E6F3FF) for eraser strokes
 
 ### Dependencies
 - @phosphor-icons/react-native (to be added)
