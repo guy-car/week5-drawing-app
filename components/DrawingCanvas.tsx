@@ -24,6 +24,7 @@ interface DrawingCanvasProps {
   onZoomChange: (zoom: number) => void;
   screenWidth: number;
   screenHeight: number;
+  selectedColor: string;
 }
 
 interface DrawingCanvasRef {
@@ -46,16 +47,18 @@ interface PathWithData {
   startX: number;
   startY: number;
   points: [number, number][];
+  color: string;
 }
 
 // ----- Undo/Redo -----
 interface Stroke {
   path: any;                        // Skia.Path
   commands: DrawingCommand[];       // for export
+  color: string;                    // stroke color
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  ({ mode, onZoomChange, screenWidth, screenHeight }, ref) => {
+  ({ mode, onZoomChange, screenWidth, screenHeight, selectedColor }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
@@ -138,7 +141,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       try {
         console.log('🎯 AI Commands received:', commands);
         const aiPath = buildPathFromCommands(commands);
-        const stroke: Stroke = { path: aiPath, commands };
+        const stroke: Stroke = { 
+          path: aiPath, 
+          commands,
+          color: selectedColor  // Use current selected color for AI strokes
+        };
 
         setStrokes(prev => [...prev, stroke]);
         setPaths(prev => [...prev, aiPath]);
@@ -247,28 +254,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         // Convert screen coordinates to canvas coordinates
         const canvasCoords = screenToCanvas(locationX, locationY);
         
-        // Round coordinates to integers to match validation expectations
-        const roundedX = Math.round(canvasCoords.x);
-        const roundedY = Math.round(canvasCoords.y);
-        
+        // Create new path with color
         const path = Skia.Path.Make();
-        path.moveTo(roundedX, roundedY);
-        
+        path.moveTo(canvasCoords.x, canvasCoords.y);
+
         setCurrentPath({
           path,
-          startX: roundedX,
-          startY: roundedY,
-          points: [[roundedX, roundedY]]
+          startX: canvasCoords.x,
+          startY: canvasCoords.y,
+          points: [[canvasCoords.x, canvasCoords.y]],
+          color: selectedColor
         });
 
-        // Capture moveTo command for AI context
-        const moveToCommand: DrawingCommand = {
+        // Add moveTo command
+        setUserCommands(prev => [...prev, {
           type: 'moveTo',
-          x: roundedX,
-          y: roundedY
-        };
-        
-        setUserCommands(prevCommands => [...prevCommands, moveToCommand]);
+          x: Math.round(canvasCoords.x),
+          y: Math.round(canvasCoords.y)
+        }]);
       }
     };
 
@@ -277,60 +280,51 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
       const touch = event.nativeEvent;
       const { locationX, locationY } = touch;
-      
+
       if (locationX !== undefined && locationY !== undefined) {
         // Convert screen coordinates to canvas coordinates
         const canvasCoords = screenToCanvas(locationX, locationY);
-        
-        // Round coordinates to integers to match validation expectations
         const roundedX = Math.round(canvasCoords.x);
         const roundedY = Math.round(canvasCoords.y);
+
+        // Update path
+        currentPath.path.lineTo(roundedX, roundedY);
         
-        const newPath = Skia.Path.Make();
-        newPath.moveTo(currentPath.startX, currentPath.startY);
-        
-        currentPath.points.forEach(([x, y]) => {
-          newPath.lineTo(x, y);
-        });
-        
-        newPath.lineTo(roundedX, roundedY);
-        
+        // Update current path data
         setCurrentPath({
-          path: newPath,
+          path: currentPath.path,
           startX: currentPath.startX,
           startY: currentPath.startY,
-          points: [...currentPath.points, [roundedX, roundedY]]
+          points: [...currentPath.points, [roundedX, roundedY]],
+          color: currentPath.color
         });
 
-        // Capture lineTo command for AI context
-        const lineToCommand: DrawingCommand = {
+        // Add lineTo command
+        setUserCommands(prev => [...prev, {
           type: 'lineTo',
           x: roundedX,
           y: roundedY
-        };
-        
-        setUserCommands(prevCommands => [...prevCommands, lineToCommand]);
+        }]);
       }
     };
 
     const onTouchEnd = () => {
-      if (mode !== 'draw' || !currentPath?.path) return;
-
-      // 1. Create stroke object
-      const stroke: Stroke = {
-        path: currentPath.path,
-        commands: [...userCommands.slice(-currentPath.points.length)] // last cmds for this stroke
-      };
-
-      // 2. Render it
-      setStrokes(prev => [...prev, stroke]);
-      setPaths(prev => [...prev, currentPath.path]); // existing render list
-      setCurrentPath(null);
-
-      // 3. History bookkeeping
-      undoStack.current.push(stroke);
-      redoStack.current = [];
-      if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+      if (currentPath) {
+        const stroke: Stroke = {
+          path: currentPath.path,
+          commands: [...userCommands],
+          color: currentPath.color
+        };
+        
+        setStrokes(prev => [...prev, stroke]);
+        setPaths(prev => [...prev, currentPath.path]);
+        
+        undoStack.current.push(stroke);
+        redoStack.current = [];
+        if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+        
+        setCurrentPath(null);
+      }
     };
 
     const panGesture = Gesture.Pan()
@@ -371,21 +365,17 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             <Path
               key={index}
               path={path}
-              color="black"
+              color={strokes[index]?.color || '#000000'}
               style="stroke"
               strokeWidth={2}
-              strokeCap="round"
-              strokeJoin="round"
             />
           ))}
           {currentPath && (
             <Path
               path={currentPath.path}
-              color="black"
+              color={currentPath.color}
               style="stroke"
               strokeWidth={2}
-              strokeCap="round"
-              strokeJoin="round"
             />
           )}
         </Group>

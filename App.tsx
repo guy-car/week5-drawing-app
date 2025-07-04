@@ -10,6 +10,7 @@ import { DrawingCommand } from './src/api/openai/types';
 import { vectorSummary } from './src/utils/vectorSummary';
 import { streamLog } from './src/api/openai/config';
 import { stamp, printPerf } from './src/utils/performance';
+import BottomToolbar from './components/BottomToolbar';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ export default function App() {
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [canvasEmpty, setCanvasEmpty] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedColor, setSelectedColor] = useState('#000000');
   const canvasRef = useRef<DrawingCanvasRef>(null);
 
   // Poll canvas empty state
@@ -215,6 +217,15 @@ export default function App() {
           onZoomChange={setZoom}
           screenWidth={screenWidth}
           screenHeight={screenHeight - 160}
+          selectedColor={selectedColor}
+        />
+      </View>
+
+      {/* Bottom Toolbar */}
+      <View style={styles.bottomToolbar}>
+        <BottomToolbar
+          color={selectedColor}
+          onColorChange={setSelectedColor}
         />
       </View>
 
@@ -442,5 +453,16 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: '600',
     fontSize: 16
+  },
+  bottomToolbar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
 }); 
