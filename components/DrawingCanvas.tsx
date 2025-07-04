@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Canvas, Path, Skia, Group, Rect, useCanvasRef } from '@shopify/react-native-skia';
+import { Canvas, Path, Skia, Group, Rect, useCanvasRef, Circle } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { 
   useSharedValue,
@@ -349,6 +349,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const strokeWidthRef = useRef(strokeWidth);
     useEffect(()=>{ strokeWidthRef.current = strokeWidth; }, [strokeWidth]);
 
+    const [cursorPos, setCursorPos] = useState<{x:number, y:number}>({ x: -1000, y: -1000 });
+    const [cursorRadius, setCursorRadius] = useState(strokeWidth / 2);
+
+    useEffect(() => {
+      setCursorRadius(strokeWidth / 2);
+    }, [strokeWidth]);
+
     const onTouchStart = (event: any) => {
       if (mode !== 'draw') return;
 
@@ -374,6 +381,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           isEraser,
         });
 
+        if (isEraser) {
+          setCursorPos({ x: canvasCoords.x, y: canvasCoords.y });
+        } else {
+          setCursorPos({ x: -1000, y: -1000 });
+        }
+
         if(!isEraser){
           setUserCommands(prev => [...prev, { type:'moveTo', x: Math.round(canvasCoords.x), y: Math.round(canvasCoords.y) }]);
         }
@@ -390,6 +403,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         const roundedY = Math.round(canvasCoords.y);
         currentPath.path.lineTo(roundedX, roundedY);
         setCurrentPath({ ...currentPath, points:[...currentPath.points,[roundedX,roundedY]] });
+        if (currentPath.isEraser) {
+          setCursorPos({ x: roundedX, y: roundedY });
+        }
         if(!currentPath.isEraser){
           setUserCommands(prev=>[...prev,{type:'lineTo',x:roundedX,y:roundedY}]);
         }
@@ -414,6 +430,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         if(!currentPath.isEraser){
           setUserCommands([]);
         }
+
+        // hide cursor when lift finger
+        setCursorPos({ x: -1000, y: -1000 });
       }
     };
 
@@ -504,6 +523,18 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             )}
           </Group>
         </Group>
+
+        {/* Eraser cursor preview */}
+        {toolRef.current === 'erase' && (
+          <Circle
+            cx={cursorPos.x}
+            cy={cursorPos.y}
+            r={cursorRadius}
+            color="rgba(0,0,0,0.25)"
+            style="stroke"
+            strokeWidth={1}
+          />
+        )}
       </Canvas>
     );
 
