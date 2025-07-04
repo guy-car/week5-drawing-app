@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   },
   aiTestContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 20,

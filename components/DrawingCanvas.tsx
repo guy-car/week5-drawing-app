@@ -412,9 +412,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             </Animated.View>
           </GestureDetector>
         </View>
-        <Text style={styles.hint}>
-          {mode === 'draw' ? 'Tap and drag to draw' : 'Use two fingers to pan'}
-        </Text>
       </View>
     );
   }
