@@ -86,13 +86,28 @@ export default function App() {
 
       if (process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1') {
         streamLog.info('🎨 Using riff-on-sketch mode');
-        const summary = vectorSummary(canvasData.commands);
-        commands = await riffOnSketch({ 
-          image: canvasData.image!,
-          summary,
-          onIncrementalDraw: canvasRef.current.addAICommandIncremental,
-          selectedColor
-        });
+        
+        // A/B Test: Conditionally use vectorSummary based on environment variable
+        const useVectorSummary = process.env.EXPO_PUBLIC_DISABLE_VECTOR_SUMMARY !== '1';
+        
+        if (useVectorSummary) {
+          streamLog.info('🔍 Using vectorSummary analysis');
+          const summary = vectorSummary(canvasData.commands);
+          commands = await riffOnSketch({ 
+            image: canvasData.image!,
+            summary,
+            onIncrementalDraw: canvasRef.current.addAICommandIncremental,
+            selectedColor
+          });
+        } else {
+          streamLog.info('📸 Using image-only analysis (no vectorSummary)');
+          commands = await riffOnSketch({ 
+            image: canvasData.image!,
+            // summary omitted for A/B test
+            onIncrementalDraw: canvasRef.current.addAICommandIncremental,
+            selectedColor
+          });
+        }
       } else {
         streamLog.info('📊 Using standard mode');
         commands = await analyzeThenDrawWithContext(canvasData.image, canvasData.commands, selectedColor);

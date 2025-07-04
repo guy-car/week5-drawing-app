@@ -24,7 +24,7 @@ class DrawingValidationError extends Error {
 
 interface RiffReq {
   image: string;
-  summary: VectorSummary;
+  summary?: VectorSummary; // Made optional for A/B testing
   onIncrementalDraw?: (cmd: DrawingCommand) => void;
   selectedColor: string;
 }
@@ -42,6 +42,7 @@ export async function riffOnSketch({ image, summary, onIncrementalDraw, selected
   const useStreaming = process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1' && onIncrementalDraw;
 
   try {
+    console.log('🎯 PROMPT BEING SENT TO AI:')
     // Build the shared request payload
     const requestBody = {
       model: 'gpt-4o',
@@ -52,7 +53,10 @@ export async function riffOnSketch({ image, summary, onIncrementalDraw, selected
           content: [
             {
               type: 'text',
-              text: `All new elements must be drawn using stroke colour ${selectedColor}.
+              text: summary ? 
+                // Original prompt with vector summary
+                `All new elements must be drawn using stroke colour ${selectedColor}.
+                
 
 Here is a vector summary of the drawing:
 ${JSON.stringify(summary, null, 2)}
@@ -64,6 +68,14 @@ Focus on the dominant angles (${summary.dominantAngles.join(', ')}°) and work w
 - maxX: ${summary.boundingBox.maxX}
 - maxY: ${summary.boundingBox.maxY}
 
+STYLE:
+- prefer long strokes
+- prefer organic, curvy lines
+- prefer natural shapes like leaves, flowers, etc.
+- occasionally use fractal shapes
+- do no use geometric shapes
+
+
 RULES:
 - Start each new shape with moveTo (except circles)
 - Generate 10-30 commands total
@@ -71,6 +83,18 @@ RULES:
 - Circle radius must be between 1-500
 - Use similar segment lengths (around ${Math.round(summary.avgSegment)} units)
 - Respect the existing shape distribution in your additions`
+                :
+                // Simplified prompt without vector summary (A/B test version)
+                `All new elements must be drawn using stroke colour ${selectedColor}.
+
+Based on the image, please add creative elements that complement the existing drawing.
+
+RULES:
+- Start each new shape with moveTo (except circles)
+- Generate 10-30 commands total
+- All coordinates must be between 0-1000
+- Circle radius must be between 1-500
+- Add elements that visually complement the existing drawing`
             },
             {
               type: 'image_url',
