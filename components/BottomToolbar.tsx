@@ -62,7 +62,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         onPress={() => handleToolChange('erase')}
       >
         <Eraser 
-          color={activeTool === 'erase' ? "#FFFFFF" : "#000000"} 
+          color={activeTool === 'erase' ? "#000000" : "#FFFFFF"} 
           size={28} 
         />
       </TouchableOpacity>
@@ -71,7 +71,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       <TouchableOpacity
         style={[
           styles.toolButton,
-          styles.inactiveButton
+          styles.activeButton
         ]}
         onPress={() => {
           if (activeTool === 'erase') {
@@ -86,7 +86,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
       {/* Pencil Width Button */}
       <TouchableOpacity
-        style={[styles.toolButton, styles.inactiveButton]}
+        style={[styles.toolButton, styles.activeButton]}
         onPress={() => {
           if (activeTool === 'erase') {
             handleToolChange('draw');
@@ -95,15 +95,15 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           setShowColorPicker(false);
         }}
       >
-        <PencilCircle color="#000000" size={28} />
+        <PencilCircle color={color} size={28} />
       </TouchableOpacity>
 
       {/* Download Button */}
       <TouchableOpacity
-        style={[styles.toolButton, styles.inactiveButton]}
+        style={[styles.toolButton, styles.activeButton]}
         onPress={() => {}}
       >
-        <DownloadSimple color="#000000" size={28} />
+        <DownloadSimple color="#FFFFFF" size={28} />
       </TouchableOpacity>
 
       {/* Color Picker Modal */}
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   toolButton: {
     width: 60,
     height: 60,
-    borderRadius: 30,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewContainer: {
-    height: 60,
+    height: 35,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
