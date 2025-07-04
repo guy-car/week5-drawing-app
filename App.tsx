@@ -216,11 +216,11 @@ export default function App() {
         {/* Right Column */}
         <View style={styles.column}>
           <TouchableOpacity 
-            style={[styles.button, canvasEmpty && styles.disabledButton]} 
+            style={[styles.button, !canvasEmpty && styles.activeButton, canvasEmpty && styles.disabledButton]} 
             onPress={handleClear}
             disabled={canvasEmpty}
           >
-            <Text style={[styles.buttonText, canvasEmpty && { opacity: 0.5 }]}>
+            <Text style={[styles.buttonText, !canvasEmpty && styles.activeButtonText, canvasEmpty && { opacity: 0.5 }]}>
               Clear
             </Text>
           </TouchableOpacity>
@@ -388,9 +388,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   modalContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalCard: { 
     width: 280, 
@@ -422,7 +421,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 6,
     minWidth: 80,
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: 'black'
   },
   modalCancel: { 
     backgroundColor: '#e0e0e0',
