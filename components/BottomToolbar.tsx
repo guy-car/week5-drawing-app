@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import ColorPicker from 'react-native-wheel-color-picker';
+import { Palette } from 'phosphor-react-native';
 
 interface BottomToolbarProps {
   color: string;
@@ -15,7 +16,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({ color, onColorChange }) =
       <TouchableOpacity
         style={[styles.colorButton, { backgroundColor: color }]}
         onPress={() => setShowColorPicker(true)}
-      />
+      >
+        <Palette color="#e0e0e0"  size={28} />
+      </TouchableOpacity>
 
       <Modal
         visible={showColorPicker}
@@ -63,11 +66,13 @@ const styles = StyleSheet.create({
     height: 50,
   },
   colorButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 2,
     borderColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
