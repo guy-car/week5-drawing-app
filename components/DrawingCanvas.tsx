@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { DrawingCommand } from '../src/api/openai/types';
 import { exportCanvas } from '../src/utils/canvasExport';
-import { BASE_CANVAS_SIZE } from '../src/constants/canvas';
+import { BASE_CANVAS_SIZE, DEFAULT_CANVAS_BG } from '../src/constants/canvas';
 import { buildPathFromCommands } from './pathBuilder';
 import { streamLog } from '../src/api/openai/config';
 import { stamp } from '../src/utils/performance';
@@ -481,7 +481,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             y={0}
             width={BASE_CANVAS_SIZE}
             height={BASE_CANVAS_SIZE}
-            color={backgroundColor || "#E6F3FF"}
+            color={backgroundColor || DEFAULT_CANVAS_BG}
           />
           {/* Strokes isolated in their own layer so eraser clears strokes only */}
           <Group layer>

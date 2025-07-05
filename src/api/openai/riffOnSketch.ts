@@ -53,22 +53,8 @@ export async function riffOnSketch({ image, summary, onIncrementalDraw, selected
           content: [
             {
               type: 'text',
-              text: summary ? 
-                // Original prompt with vector summary
-                `All new elements must be drawn using stroke colour ${selectedColor}.
-                
-
-Here is a vector summary of the drawing:
-${JSON.stringify(summary, null, 2)}
-
-Based on this analysis, please add creative elements that complement the existing drawing.
-Focus on the dominant angles (${summary.dominantAngles.join(', ')}°) and work within the bounding box:
-- minX: ${summary.boundingBox.minX}
-- minY: ${summary.boundingBox.minY}
-- maxX: ${summary.boundingBox.maxX}
-- maxY: ${summary.boundingBox.maxY}
-
-STYLE:
+              text:
+                `STYLE
 - prefer long strokes
 - prefer organic, curvy lines
 - prefer natural shapes like leaves, flowers, etc.
@@ -81,11 +67,7 @@ RULES:
 - Generate 10-30 commands total
 - All coordinates must be between 0-1000
 - Circle radius must be between 1-500
-- Use similar segment lengths (around ${Math.round(summary.avgSegment)} units)
-- Respect the existing shape distribution in your additions`
-                :
-                // Simplified prompt without vector summary (A/B test version)
-                `All new elements must be drawn using stroke colour ${selectedColor}.
+- Respect the existing shape distribution in your additions
 
 Based on the image, please add creative elements that complement the existing drawing.
 

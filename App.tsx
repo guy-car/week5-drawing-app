@@ -13,6 +13,7 @@ import { streamLog } from './src/api/openai/config';
 import { stamp, printPerf } from './src/utils/performance';
 import BottomToolbar from './components/BottomToolbar';
 import LinearGradient from 'react-native-linear-gradient';
+import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL } from './src/constants/canvas';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -41,7 +42,7 @@ export default function App() {
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [canvasEmpty, setCanvasEmpty] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedColor, setSelectedColor] = useState('#000000');
+  const [selectedColor, setSelectedColor] = useState(DEFAULT_STROKE_COL);
   const [activeTool, setActiveTool] = useState<'draw' | 'erase'>('draw');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const canvasRef = useRef<DrawingCanvasRef>(null);
@@ -215,7 +216,7 @@ export default function App() {
           >
             <Alien 
               size={32}
-              color={selectedColor === '#000000' ? '#2eff4d' : selectedColor}
+              color={selectedColor === DEFAULT_STROKE_COL ? '#2eff4d' : selectedColor}
               weight="fill"
             />
           </TouchableOpacity>
@@ -268,7 +269,7 @@ export default function App() {
           onZoomChange={setZoom}
           selectedColor={selectedColor}
           onModeChange={setMode}
-          backgroundColor="#E6F3FF"
+          backgroundColor={DEFAULT_CANVAS_BG}
           tool={activeTool}
           strokeWidth={strokeWidth}
         />
@@ -279,7 +280,7 @@ export default function App() {
         <BottomToolbar
           color={selectedColor}
           onColorChange={setSelectedColor}
-          backgroundColor="#E6F3FF"
+          backgroundColor={DEFAULT_CANVAS_BG}
           onToolChange={setActiveTool}
           onStrokeWidthChange={setStrokeWidth}
           defaultStrokeWidth={strokeWidth}
