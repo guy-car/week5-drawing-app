@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Modal from 'react-native-modal';
@@ -67,6 +67,21 @@ export default function App() {
   const canZoomIn = zoom < MAX_ZOOM;
   const canZoomOut = zoom > MIN_ZOOM;
 
+  // Add fade animation value
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Add ref to track if we've seen the first command in current session
+  const hasSeenFirstCommandRef = useRef(false);
+
+  // Handle fade animation when isTestingAI changes
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: isTestingAI ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isTestingAI]);
+
   // Poll canvas empty state
   useEffect(() => {
     const interval = setInterval(() => {
@@ -99,6 +114,8 @@ export default function App() {
       return;
     }
 
+    // Reset the first command flag at the start of each AI session
+    hasSeenFirstCommandRef.current = false;
     setIsTestingAI(true);
     streamLog.info('🎨 Starting AI analysis...');
 
@@ -113,7 +130,6 @@ export default function App() {
       if (process.env.EXPO_PUBLIC_RIFF_ON_SKETCH === '1') {
         streamLog.info('🎨 Using riff-on-sketch mode');
         
-        // A/B Test: Conditionally use vectorSummary based on environment variable
         const useVectorSummary = process.env.EXPO_PUBLIC_DISABLE_VECTOR_SUMMARY !== '1';
         
         if (useVectorSummary) {
@@ -122,15 +138,28 @@ export default function App() {
           commands = await riffOnSketch({ 
             image: canvasData.image!,
             summary,
-            onIncrementalDraw: canvasRef.current.addAICommandIncremental,
+            onIncrementalDraw: (command) => {
+              // Check if this is the first command of this session
+              if (!hasSeenFirstCommandRef.current) {
+                hasSeenFirstCommandRef.current = true;
+                handleFirstAICommand();
+              }
+              canvasRef.current?.addAICommandIncremental(command);
+            },
             selectedColor
           });
         } else {
           streamLog.info('📸 Using image-only analysis (no vectorSummary)');
           commands = await riffOnSketch({ 
             image: canvasData.image!,
-            // summary omitted for A/B test
-            onIncrementalDraw: canvasRef.current.addAICommandIncremental,
+            onIncrementalDraw: (command) => {
+              // Check if this is the first command of this session
+              if (!hasSeenFirstCommandRef.current) {
+                hasSeenFirstCommandRef.current = true;
+                handleFirstAICommand();
+              }
+              canvasRef.current?.addAICommandIncremental(command);
+            },
             selectedColor
           });
         }
@@ -143,12 +172,16 @@ export default function App() {
 
       stamp('done');
       printPerf();
-    } catch (error: unknown) {
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       streamLog.warn('❌ Error during AI analysis:', errorMessage);
       Alert.alert('Error', errorMessage);
     } finally {
-      setIsTestingAI(false);
+      // Only set isTestingAI to false if we haven't seen any commands
+      // (if we have seen commands, handleFirstAICommand already did this)
+      if (!hasSeenFirstCommandRef.current) {
+        setIsTestingAI(false);
+      }
     }
   };
 
@@ -185,6 +218,13 @@ export default function App() {
       console.error('Font loading error:', fontError);
     }
   }, [fontsLoaded, fontError]);
+
+  const handleFirstAICommand = () => {
+    // Hide loading message as soon as first command arrives
+    setIsTestingAI(false);
+    // Immediately snap the fade animation to 0
+    fadeAnim.setValue(0);
+  };
 
   // Don't render anything until fonts are loaded
   if (fontError) {
@@ -318,6 +358,49 @@ export default function App() {
               tool={activeTool}
               strokeWidth={strokeWidth}
             />
+            
+            {/* Loading Message */}
+            <Animated.View 
+              style={[
+                styles.loadingContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-10, 0]
+                    })
+                  }]
+                }
+              ]}
+              pointerEvents="none"
+            >
+              {/* Glow layers */}
+              <CustomText 
+                style={[styles.loadingText, styles.textGlow3]}
+                fontFamily="Exo2-Medium"
+              >
+                [Incoming transmission...]
+              </CustomText>
+              <CustomText 
+                style={[styles.loadingText, styles.textGlow2]}
+                fontFamily="Exo2-Medium"
+              >
+                [Incoming transmission...]
+              </CustomText>
+              <CustomText 
+                style={[styles.loadingText, styles.textGlow1]}
+                fontFamily="Exo2-Medium"
+              >
+                [Incoming transmission...]
+              </CustomText>
+              <CustomText 
+                style={[styles.loadingText]}
+                fontFamily="Exo2-Medium"
+              >
+                [Incoming transmission...]
+              </CustomText>
+            </Animated.View>
           </View>
 
           {/* Bottom Toolbar */}
@@ -513,5 +596,32 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: '600',
     fontSize: 16
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: '25%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    textAlign: 'center',
+    position: 'absolute',
+  },
+  textGlow1: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 25,
+  },
+  textGlow2: {
+    color: 'rgba(255, 255, 255, 0.2)',
+    fontSize: 26,
+  },
+  textGlow3: {
+    color: 'rgba(255, 255, 255, 0.1)',
+    fontSize: 27,
   },
 }); 
