@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { DrawingCommand } from '../src/api/openai/types';
 import { exportCanvas } from '../src/utils/canvasExport';
-import { BASE_CANVAS_SIZE, DEFAULT_CANVAS_BG } from '../src/constants/canvas';
+import { BASE_CANVAS_SIZE, DEFAULT_CANVAS_BG, DEFAULT_APP_BG } from '../src/constants/canvas';
 import { buildPathFromCommands } from './pathBuilder';
 import { streamLog } from '../src/api/openai/config';
 import { stamp } from '../src/utils/performance';
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   canvasContainer: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: DEFAULT_APP_BG,
     borderRadius: 8,
     marginVertical: 16,
     marginHorizontal: 2,

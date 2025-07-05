@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   widthPickerContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#e0e0e0',
     padding: 20,
     borderRadius: 10,
     width: 300,

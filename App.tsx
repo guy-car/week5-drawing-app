@@ -13,7 +13,7 @@ import { streamLog } from './src/api/openai/config';
 import { stamp, printPerf } from './src/utils/performance';
 import BottomToolbar from './components/BottomToolbar';
 import LinearGradient from 'react-native-linear-gradient';
-import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL } from './src/constants/canvas';
+import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL, DEFAULT_APP_BG } from './src/constants/canvas';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -325,11 +325,11 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: DEFAULT_APP_BG,
   },
   header: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: DEFAULT_APP_BG,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     paddingTop: 50,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   canvasContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: DEFAULT_APP_BG,
   },
   bottomToolbar: {
     backgroundColor: 'transparent',
