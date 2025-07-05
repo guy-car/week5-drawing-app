@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     position: 'absolute',
-    top: '25%',
+    top: '15%',
     left: 0,
     right: 0,
     alignItems: 'center',
