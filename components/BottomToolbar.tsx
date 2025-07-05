@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { Palette, Eraser, PencilCircle, DownloadSimple } from 'phosphor-react-native';
 import Slider from '@react-native-community/slider';
+import GlowButton from './GlowButton';
 
 interface BottomToolbarProps {
   color: string;
@@ -56,12 +57,14 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   return (
     <View style={styles.container}>
       {/* Eraser Button */}
-      <TouchableOpacity
+      <GlowButton
         style={[
           styles.toolButton,
           (!canErase || activeTool === 'erase') && styles.disabledButton,
           (canErase && activeTool !== 'erase') && styles.activeButton
         ]}
+        glowLevel={(canErase && activeTool !== 'erase') ? 'medium' : 'none'}
+        glowColor="rgba(255, 255, 255, 0.4)"
         onPress={() => handleToolChange('erase')}
         disabled={!canErase}
       >
@@ -69,14 +72,16 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           color={(!canErase || activeTool === 'erase') ? "#666666" : "#FFFFFF"}
           size={28} 
         />
-      </TouchableOpacity>
+      </GlowButton>
 
       {/* Color Picker Button */}
-      <TouchableOpacity
+      <GlowButton
         style={[
           styles.toolButton,
           styles.activeButton
         ]}
+        glowLevel="medium"
+        glowColor={`${color}80`}
         onPress={() => {
           if (activeTool === 'erase') {
             handleToolChange('draw');
@@ -86,11 +91,13 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         }}
       >
         <Palette color={color} size={28} />
-      </TouchableOpacity>
+      </GlowButton>
 
       {/* Pencil Width Button */}
-      <TouchableOpacity
+      <GlowButton
         style={[styles.toolButton, styles.activeButton]}
+        glowLevel="medium"
+        glowColor={`${color}80`}
         onPress={() => {
           if (activeTool === 'erase') {
             handleToolChange('draw');
@@ -100,15 +107,17 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         }}
       >
         <PencilCircle color={color} size={28} />
-      </TouchableOpacity>
+      </GlowButton>
 
       {/* Download Button */}
-      <TouchableOpacity
+      <GlowButton
         style={[styles.toolButton, styles.activeButton]}
+        glowLevel="medium"
+        glowColor="rgba(255, 255, 255, 0.4)"
         onPress={() => {}}
       >
         <DownloadSimple color="#FFFFFF" size={28} />
-      </TouchableOpacity>
+      </GlowButton>
 
       {/* Color Picker Modal */}
       <Modal
