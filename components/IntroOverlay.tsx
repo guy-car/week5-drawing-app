@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { 
   View, 
-  Text, 
   StyleSheet, 
   Animated, 
   TouchableOpacity,
@@ -9,24 +8,23 @@ import {
   Dimensions
 } from 'react-native';
 import StarField from './StarField';
+import CustomText from './CustomText';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const INTRO_TEXT = `Three days ago, Fractal Tech detected an unknown signal originating from beyond our solar system.
+const INTRO_TEXT = `Entities have made contact with Fractal Tech.
 
-The transmission contained no audio, no text, no recognizable data patterns. Only visual elements—strange drawings that seem to respond to our own.
+We know little about their intentions. 
+Their visual language is a mystery.
 
-Our xenolinguistics team believes these entities communicate exclusively through visual art. They appear to be studying us, learning our patterns, reacting to our sketches with drawings of their own.
+Yet communication attempts have shown they respond 
+to typical human shapes.
 
-We don't know what they want. We don't know what their symbols mean. We don't know if they're friendly.
+Your device has been selected for the experimental contact protocol. 
 
-But they're waiting.
+Draw something. Use colors, change pencil width and press the transmission button at the top.
 
-Your device has been selected for the experimental two-way visual communication protocol. Draw something. Anything. See how they respond.
-
-Remember: Every mark you make is being transmitted across the void to an intelligence we cannot comprehend.
-
-What will you show them about humanity?`;
+Report all your findings to the Tech Hub.`;
 
 interface Props {
   onComplete: () => void;
@@ -114,8 +112,8 @@ export default function IntroOverlay({ onComplete }: Props) {
           }}
         >
           <View style={styles.content}>
-            <Text style={styles.title}>Draw Beyond</Text>
-            <Text style={styles.text}>{INTRO_TEXT}</Text>
+            <CustomText fontFamily="Exo2-MediumItalic" style={styles.title}>DRAW BEYOND</CustomText>
+            <CustomText fontFamily="Exo2-Light" style={styles.text}>{INTRO_TEXT}</CustomText>
             <View style={styles.spacer} />
           </View>
         </ScrollView>
@@ -133,7 +131,7 @@ export default function IntroOverlay({ onComplete }: Props) {
               })
             }
           ]}>
-            <Text style={styles.startText}>[START]</Text>
+            <CustomText fontFamily="Exo2-Medium" style={styles.startText}>BEGIN TRANSMISSION</CustomText>
           </Animated.View>
         </TouchableOpacity>
       </View>
@@ -168,16 +166,13 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 32,
     textAlign: 'center',
-    fontFamily: 'Exo2-Medium',
-    fontStyle: 'italic',
     marginBottom: 40,
   },
   text: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 20,
     lineHeight: 28,
     textAlign: 'center',
-    fontFamily: 'Exo2-Light',
   },
   spacer: {
     height: SCREEN_HEIGHT,
@@ -200,7 +195,6 @@ const styles = StyleSheet.create({
   startText: {
     color: 'white',
     fontSize: 24,
-    fontFamily: 'Exo2-Regular',
     textAlign: 'center',
   },
 }); 

@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Modal from 'react-native-modal';
+import { useFonts } from 'expo-font';
 import { Alien, MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowUDownLeft, ArrowUDownRight, TrashSimple } from 'phosphor-react-native';
 import DrawingCanvas from './components/DrawingCanvas';
 import { analyzeThenDrawWithContext } from './src/api/openai';
@@ -15,6 +16,7 @@ import BottomToolbar from './components/BottomToolbar';
 import LinearGradient from 'react-native-linear-gradient';
 import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL, DEFAULT_APP_BG } from './src/constants/canvas';
 import IntroOverlay from './components/IntroOverlay';
+import CustomText from './components/CustomText';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -38,6 +40,13 @@ interface DrawingCanvasRef {
 }
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    'Exo2-Light': require('./assets/fonts/Exo2-Light.ttf'),
+    'Exo2-Medium': require('./assets/fonts/Exo2-Medium.ttf'),
+    'Exo2-MediumItalic': require('./assets/fonts/Exo2-MediumItalic.ttf'),
+    'Exo2-Regular': require('./assets/fonts/Exo2-Medium.ttf'),
+  });
+
   const [mode, setMode] = useState<'draw' | 'pan'>('draw');
   const [zoom, setZoom] = useState(1.25); // Match initial zoom level from DrawingCanvas
   const [isTestingAI, setIsTestingAI] = useState(false);
@@ -167,6 +176,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Debug font loading
+  useEffect(() => {
+    console.log('Font loading status:', { fontsLoaded, fontError });
+    if (fontError) {
+      console.error('Font loading error:', fontError);
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Don't render anything until fonts are loaded
+  if (fontError) {
+    console.error('Font error, falling back to system fonts');
+    // Continue with rendering using system fonts
+  } else if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="auto" />
@@ -181,9 +206,9 @@ export default function App() {
                 style={[styles.button, mode === 'draw' && styles.activeButton]} 
                 onPress={toggleMode}
               >
-                <Text style={[styles.buttonText, mode === 'draw' && styles.activeButtonText]}>
+                <CustomText style={[styles.buttonText, mode === 'draw' && styles.activeButtonText]}>
                   {mode === 'draw' ? 'Move' : 'Draw'}
-                </Text>
+                </CustomText>
               </TouchableOpacity>
 
               <View style={styles.buttonGroup}>
@@ -304,14 +329,14 @@ export default function App() {
             style={styles.modal}
           >
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Clear canvas?</Text>
-              <Text style={styles.modalMsg}>This will erase all strokes.</Text>
+              <CustomText style={styles.modalTitle}>Clear canvas?</CustomText>
+              <CustomText style={styles.modalMsg}>This will erase all strokes.</CustomText>
               <View style={styles.modalRow}>
                 <TouchableOpacity
                   style={[styles.modalBtn, styles.modalCancel]}
                   onPress={() => setShowConfirm(false)}
                 >
-                  <Text style={styles.modalCancelTxt}>Cancel</Text>
+                  <CustomText style={styles.modalCancelTxt}>Cancel</CustomText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalBtn, styles.modalDanger]}
@@ -320,7 +345,7 @@ export default function App() {
                     setShowConfirm(false);
                   }}
                 >
-                  <Text style={styles.modalDangerTxt}>Clear</Text>
+                  <CustomText style={styles.modalDangerTxt}>Clear</CustomText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -374,10 +399,11 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#000000',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   activeButtonText: {
     color: '#ffffff',
+    fontWeight: '400',
   },
   buttonGroup: {
     flexDirection: 'row',

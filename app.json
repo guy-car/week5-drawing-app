@@ -19,11 +19,6 @@
     },
     "web": {
     },
-    "plugins": [],
-    "fonts": {
-      "Exo2-Light": "./assets/fonts/Exo2-Light.ttf",
-      "Exo2-Regular": "./assets/fonts/Exo2-Regular.ttf",
-      "Exo2-Medium": "./assets/fonts/Exo2-MediumItalic.ttf"
-    }
+    "plugins": []
   }
 } 
