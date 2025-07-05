@@ -9,16 +9,33 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow access to save your drawings to the camera roll"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "MEDIA_LIBRARY",
+        "MEDIA_LIBRARY_WRITE_ONLY"
+      ]
     },
     "web": {
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow access to save your drawings to the camera roll",
+          "savePhotosPermission": "Allow access to save your drawings to the camera roll",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      "expo-file-system"
+    ]
   }
 } 

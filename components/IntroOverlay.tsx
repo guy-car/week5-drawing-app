@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: SCREEN_HEIGHT - 280,
+    paddingTop: SCREEN_HEIGHT - 240,
     paddingHorizontal: 40,
     paddingBottom: 20,
   },

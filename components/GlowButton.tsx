@@ -40,9 +40,9 @@ const GlowButton: React.FC<GlowButtonProps> = ({
       case 'high':
         return {
           boxShadow: `
-            0 0 10px ${baseColor},
-            0 0 20px ${mediumColor},
-            0 0 30px ${lightColor}
+            0 0 15px ${baseColor},
+            0 0 25px ${mediumColor},
+            0 0 40px ${lightColor}
           `
         };
       default:

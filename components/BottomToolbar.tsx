@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { Palette, Eraser, PencilCircle, DownloadSimple } from 'phosphor-react-native';
 import Slider from '@react-native-community/slider';
 import GlowButton from './GlowButton';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 
 interface BottomToolbarProps {
   color: string;
@@ -13,6 +15,8 @@ interface BottomToolbarProps {
   onStrokeWidthChange?: (width: number) => void;
   defaultStrokeWidth?: number;
   canErase?: boolean;
+  canvasRef?: any;
+  canvasEmpty?: boolean;
 }
 
 const ERASER_WIDTH = 48;
@@ -28,6 +32,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onStrokeWidthChange,
   defaultStrokeWidth = DEFAULT_DRAW_WIDTH,
   canErase = false,
+  canvasRef,
+  canvasEmpty = true,
 }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showWidthPicker, setShowWidthPicker] = useState(false);
@@ -53,7 +59,37 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     lastDrawWidth.current = width;
     if (onStrokeWidthChange) onStrokeWidthChange(width);
   };
-  
+
+  const handleSave = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera roll access to save your drawing');
+        return;
+      }
+
+      const imageUri = await canvasRef?.current?.exportCanvas();
+      if (!imageUri) {
+        Alert.alert('Error', 'Failed to export canvas');
+        return;
+      }
+
+      // Convert base64 to file URI
+      const base64Data = imageUri.split(',')[1];
+      const fileUri = `${FileSystem.cacheDirectory}drawing-${Date.now()}.png`;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      await MediaLibrary.saveToLibraryAsync(fileUri);
+      await FileSystem.deleteAsync(fileUri); // Clean up temp file
+      Alert.alert('Success', 'Drawing saved to camera roll');
+    } catch (error) {
+      console.error('Save error:', error);
+      Alert.alert('Error', 'Failed to save drawing');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Eraser Button */}
@@ -111,12 +147,20 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
       {/* Download Button */}
       <GlowButton
-        style={[styles.toolButton, styles.activeButton]}
-        glowLevel="medium"
+        style={[
+          styles.toolButton,
+          !canvasEmpty && styles.activeButton,
+          canvasEmpty && styles.disabledButton
+        ]}
+        glowLevel={!canvasEmpty ? 'medium' : 'none'}
         glowColor="rgba(255, 255, 255, 0.4)"
-        onPress={() => {}}
+        onPress={handleSave}
+        disabled={canvasEmpty}
       >
-        <DownloadSimple color="#FFFFFF" size={28} />
+        <DownloadSimple 
+          color={!canvasEmpty ? "#FFFFFF" : "#666666"}
+          size={28} 
+        />
       </GlowButton>
 
       {/* Color Picker Modal */}
