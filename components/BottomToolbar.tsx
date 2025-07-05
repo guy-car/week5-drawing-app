@@ -11,6 +11,7 @@ interface BottomToolbarProps {
   onToolChange?: (tool: 'draw' | 'erase') => void;
   onStrokeWidthChange?: (width: number) => void;
   defaultStrokeWidth?: number;
+  canErase?: boolean;
 }
 
 const ERASER_WIDTH = 48;
@@ -24,7 +25,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   backgroundColor = "#E6F3FF",
   onToolChange,
   onStrokeWidthChange,
-  defaultStrokeWidth = DEFAULT_DRAW_WIDTH
+  defaultStrokeWidth = DEFAULT_DRAW_WIDTH,
+  canErase = false,
 }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showWidthPicker, setShowWidthPicker] = useState(false);
@@ -57,12 +59,14 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       <TouchableOpacity
         style={[
           styles.toolButton,
-          activeTool === 'erase' ? styles.activeButton : styles.inactiveButton
+          (!canErase || activeTool === 'erase') && styles.disabledButton,
+          (canErase && activeTool !== 'erase') && styles.activeButton
         ]}
         onPress={() => handleToolChange('erase')}
+        disabled={!canErase}
       >
         <Eraser 
-          color={activeTool === 'erase' ? "#000000" : "#FFFFFF"} 
+          color={(!canErase || activeTool === 'erase') ? "#666666" : "#FFFFFF"}
           size={28} 
         />
       </TouchableOpacity>
@@ -211,6 +215,10 @@ const styles = StyleSheet.create({
   },
   inactiveButton: {
     backgroundColor: '#e0e0e0',
+  },
+  disabledButton: {
+    backgroundColor: '#e0e0e0',
+    opacity: 0.5,
   },
   modalContainer: {
     flex: 1,

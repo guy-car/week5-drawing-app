@@ -535,7 +535,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             cx={cursorPos.x}
             cy={cursorPos.y}
             r={cursorRadius}
-            color="rgba(0,0,0,0.25)"
+            color="#666666"
             style="stroke"
             strokeWidth={1}
           />

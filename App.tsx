@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Modal from 'react-native-modal';
-import { Alien, MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowUDownLeft, ArrowUDownRight } from 'phosphor-react-native';
+import { Alien, MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowUDownLeft, ArrowUDownRight, TrashSimple } from 'phosphor-react-native';
 import DrawingCanvas from './components/DrawingCanvas';
 import { analyzeThenDrawWithContext } from './src/api/openai';
 import { riffOnSketch } from './src/api/openai/riffOnSketch';
@@ -228,10 +228,13 @@ export default function App() {
             style={[styles.button, !canvasEmpty && styles.activeButton, canvasEmpty && styles.disabledButton]} 
             onPress={handleClear}
             disabled={canvasEmpty}
+            accessibilityLabel="Clear canvas"
           >
-            <Text style={[styles.buttonText, !canvasEmpty && styles.activeButtonText, canvasEmpty && { opacity: 0.5 }]}>
-              Clear
-            </Text>
+            <TrashSimple
+              size={28}
+              color={!canvasEmpty ? "#FFFFFF" : "#666666"}
+              weight="bold"
+            />
           </TouchableOpacity>
 
           <View style={styles.buttonGroup}>
@@ -284,6 +287,7 @@ export default function App() {
           onToolChange={setActiveTool}
           onStrokeWidthChange={setStrokeWidth}
           defaultStrokeWidth={strokeWidth}
+          canErase={!canvasEmpty}
         />
       </View>
 
@@ -330,8 +334,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     backgroundColor: DEFAULT_APP_BG,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     paddingTop: 50,
     paddingBottom: 10,
   },
@@ -395,8 +397,6 @@ const styles = StyleSheet.create({
   },
   bottomToolbar: {
     backgroundColor: 'transparent',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
     paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 16,

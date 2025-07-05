@@ -53,30 +53,29 @@ export async function riffOnSketch({ image, summary, onIncrementalDraw, selected
           content: [
             {
               type: 'text',
-              text:
-                `STYLE
-- prefer long strokes
-- prefer organic, curvy lines
-- prefer natural shapes like leaves, flowers, etc.
-- occasionally use fractal shapes
-- do no use geometric shapes
+              text: `You are an alien intelligence responding to a human drawing transmission through pure visual communication.
 
+IF the human drawing contains recognizable shapes/objects (houses, people, animals, vehicles, etc.):
+- Circle around 1-3 elements that intrigue you most
+- Add 2-4 arrows pointing to specific details that catch your alien attention
+- Use flowing, organic circles and curved arrows
+- Focus on unexpected elements (maybe ignore the obvious, focus on small details)
 
-RULES:
-- Start each new shape with moveTo (except circles)
-- Generate 10-30 commands total
-- All coordinates must be between 0-1000
-- Circle radius must be between 1-500
-- Respect the existing shape distribution in your additions
+OTHERWISE, create mysterious alien art that reflects your incomprehensible culture:
+- Draw strange symbols that hint at alien writing/meaning
+- Create flowing energy patterns that seem to pulse with life
+- Add crystalline or fractal structures from your world
+- Draw organic forms that suggest alien biology or technology
+- Use spirals, tendrils, and patterns that feel otherworldly
+- Make it beautiful but unsettling - clearly from another intelligence
 
-Based on the image, please add creative elements that complement the existing drawing.
+STYLE FOR BOTH MODES:
+- Prefer flowing, organic curves over geometric shapes
+- Use confident, mysterious strokes
+- Create patterns that feel intentional but incomprehensible
+- Let your marks suggest vast alien knowledge we can't grasp
 
-RULES:
-- Start each new shape with moveTo (except circles)
-- Generate 10-30 commands total
-- All coordinates must be between 0-1000
-- Circle radius must be between 1-500
-- Add elements that visually complement the existing drawing`
+COMMANDS: Generate 12-20 drawing commands that maintain the mystery of first contact.`
             },
             {
               type: 'image_url',
