@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL, DEFAULT_APP_BG } from './src/constants/canvas';
 import IntroOverlay from './components/IntroOverlay';
 import CustomText from './components/CustomText';
+import GlowButton from './components/GlowButton';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -202,18 +203,20 @@ export default function App() {
           <View style={styles.header}>
             {/* Left Column */}
             <View style={styles.column}>
-              <TouchableOpacity 
+              <GlowButton 
                 style={[styles.button, mode === 'draw' && styles.activeButton]} 
+                glowLevel={mode === 'draw' ? 'medium' : 'none'}
                 onPress={toggleMode}
               >
                 <CustomText style={[styles.buttonText, mode === 'draw' && styles.activeButtonText]}>
                   {mode === 'draw' ? 'Move' : 'Draw'}
                 </CustomText>
-              </TouchableOpacity>
+              </GlowButton>
 
               <View style={styles.buttonGroup}>
-                <TouchableOpacity 
+                <GlowButton 
                   style={[styles.iconButton, canUndo && styles.activeButton, !canUndo && styles.disabledButton]} 
+                  glowLevel={canUndo ? 'low' : 'none'}
                   onPress={handleUndo}
                   disabled={!canUndo}
                 >
@@ -222,9 +225,10 @@ export default function App() {
                     color={canUndo ? "#FFFFFF" : "#666666"}
                     weight="bold"
                   />
-                </TouchableOpacity>
-                <TouchableOpacity 
+                </GlowButton>
+                <GlowButton 
                   style={[styles.iconButton, canRedo && styles.activeButton, !canRedo && styles.disabledButton]} 
+                  glowLevel={canRedo ? 'low' : 'none'}
                   onPress={handleRedo}
                   disabled={!canRedo}
                 >
@@ -233,14 +237,16 @@ export default function App() {
                     color={canRedo ? "#FFFFFF" : "#666666"}
                     weight="bold"
                   />
-                </TouchableOpacity>
+                </GlowButton>
               </View>
             </View>
 
             {/* Center Column */}
             <View style={styles.column}>
-              <TouchableOpacity 
+              <GlowButton 
                 style={[styles.aiButton, isTestingAI && styles.disabledButton]} 
+                glowLevel={!isTestingAI ? 'high' : 'none'}
+                glowColor={`${selectedColor}80`}
                 onPress={proceedWithAPICallHandler}
                 disabled={isTestingAI}
               >
@@ -250,27 +256,29 @@ export default function App() {
                   // color={selectedColor === DEFAULT_STROKE_COL ? '#2eff4d' : selectedColor}
                   weight="fill"
                 />
-              </TouchableOpacity>
+              </GlowButton>
             </View>
 
             {/* Right Column */}
             <View style={styles.column}>
-              <TouchableOpacity 
+              <GlowButton 
                 style={[styles.button, !canvasEmpty && styles.activeButton, canvasEmpty && styles.disabledButton]} 
+                glowLevel={!canvasEmpty ? 'medium' : 'none'}
+                glowColor="rgba(255, 255, 255, 0.4)"
                 onPress={handleClear}
                 disabled={canvasEmpty}
-                accessibilityLabel="Clear canvas"
               >
                 <TrashSimple
                   size={28}
                   color={!canvasEmpty ? "#FFFFFF" : "#666666"}
                   weight="bold"
                 />
-              </TouchableOpacity>
+              </GlowButton>
 
               <View style={styles.buttonGroup}>
-                <TouchableOpacity 
+                <GlowButton 
                   style={[styles.iconButton, canZoomOut && styles.activeButton, !canZoomOut && styles.disabledButton]} 
+                  glowLevel={canZoomOut ? 'low' : 'none'}
                   onPress={() => handleZoom(false)}
                   disabled={!canZoomOut}
                 >
@@ -279,9 +287,10 @@ export default function App() {
                     color={canZoomOut ? "#FFFFFF" : "#666666"}
                     weight="bold"
                   />
-                </TouchableOpacity>
-                <TouchableOpacity 
+                </GlowButton>
+                <GlowButton 
                   style={[styles.iconButton, canZoomIn && styles.activeButton, !canZoomIn && styles.disabledButton]} 
+                  glowLevel={canZoomIn ? 'low' : 'none'}
                   onPress={() => handleZoom(true)}
                   disabled={!canZoomIn}
                 >
@@ -290,7 +299,7 @@ export default function App() {
                     color={canZoomIn ? "#FFFFFF" : "#666666"}
                     weight="bold"
                   />
-                </TouchableOpacity>
+                </GlowButton>
               </View>
             </View>
           </View>

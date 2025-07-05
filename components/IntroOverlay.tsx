@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import StarField from './StarField';
 import CustomText from './CustomText';
+import GlowButton from './GlowButton';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -121,19 +122,20 @@ export default function IntroOverlay({ onComplete }: Props) {
 
       {/* Button section */}
       <View style={styles.buttonSection}>
-        <TouchableOpacity onPress={handleStart}>
-          <Animated.View style={[
-            styles.startButton,
-            {
-              opacity: startGlowAnim.interpolate({
-                inputRange: [0.3, 1],
-                outputRange: [0.7, 1]
-              })
-            }
-          ]}>
+        <Animated.View style={{
+          opacity: startGlowAnim.interpolate({
+            inputRange: [0.3, 1],
+            outputRange: [0.7, 1]
+          })
+        }}>
+          <GlowButton
+            style={styles.startButton}
+            glowLevel="high"
+            onPress={handleStart}
+          >
             <CustomText fontFamily="Exo2-Medium" style={styles.startText}>BEGIN TRANSMISSION</CustomText>
-          </Animated.View>
-        </TouchableOpacity>
+          </GlowButton>
+        </Animated.View>
       </View>
     </Animated.View>
   );
@@ -185,12 +187,6 @@ const styles = StyleSheet.create({
   },
   startButton: {
     padding: 15,
-    borderRadius: 8,
-    boxShadow: `
-      0 0 10px rgba(255, 255, 255, 0.4),
-      0 0 20px rgba(255, 255, 255, 0.3),
-      0 0 30px rgba(255, 255, 255, 0.2)
-    `,
   },
   startText: {
     color: 'white',
