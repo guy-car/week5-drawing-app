@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Alert } from 'rea
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Modal from 'react-native-modal';
+import { useFonts } from 'expo-font';
 import { Alien, MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowUDownLeft, ArrowUDownRight, TrashSimple } from 'phosphor-react-native';
 import DrawingCanvas from './components/DrawingCanvas';
 import { analyzeThenDrawWithContext } from './src/api/openai';
@@ -14,6 +15,8 @@ import { stamp, printPerf } from './src/utils/performance';
 import BottomToolbar from './components/BottomToolbar';
 import LinearGradient from 'react-native-linear-gradient';
 import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL, DEFAULT_APP_BG } from './src/constants/canvas';
+import IntroOverlay from './components/IntroOverlay';
+import CustomText from './components/CustomText';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -37,6 +40,13 @@ interface DrawingCanvasRef {
 }
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    'Exo2-Light': require('./assets/fonts/Exo2-Light.ttf'),
+    'Exo2-Medium': require('./assets/fonts/Exo2-Medium.ttf'),
+    'Exo2-MediumItalic': require('./assets/fonts/Exo2-MediumItalic.ttf'),
+    'Exo2-Regular': require('./assets/fonts/Exo2-Medium.ttf'),
+  });
+
   const [mode, setMode] = useState<'draw' | 'pan'>('draw');
   const [zoom, setZoom] = useState(1.25); // Match initial zoom level from DrawingCanvas
   const [isTestingAI, setIsTestingAI] = useState(false);
@@ -46,6 +56,8 @@ export default function App() {
   const [activeTool, setActiveTool] = useState<'draw' | 'erase'>('draw');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const canvasRef = useRef<DrawingCanvasRef>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [showMainContent, setShowMainContent] = useState(false);
   
   // Zoom button state
   const MIN_ZOOM = 0.5;
@@ -164,164 +176,192 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Debug font loading
+  useEffect(() => {
+    console.log('Font loading status:', { fontsLoaded, fontError });
+    if (fontError) {
+      console.error('Font loading error:', fontError);
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Don't render anything until fonts are loaded
+  if (fontError) {
+    console.error('Font error, falling back to system fonts');
+    // Continue with rendering using system fonts
+  } else if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="auto" />
       
-      {/* Header Controls */}
-      <View style={styles.header}>
-        {/* Left Column */}
-        <View style={styles.column}>
-          <TouchableOpacity 
-            style={[styles.button, mode === 'draw' && styles.activeButton]} 
-            onPress={toggleMode}
-          >
-            <Text style={[styles.buttonText, mode === 'draw' && styles.activeButtonText]}>
-              {mode === 'draw' ? 'Move' : 'Draw'}
-            </Text>
-          </TouchableOpacity>
+      {showMainContent && (
+        <>
+          {/* Header Controls */}
+          <View style={styles.header}>
+            {/* Left Column */}
+            <View style={styles.column}>
+              <TouchableOpacity 
+                style={[styles.button, mode === 'draw' && styles.activeButton]} 
+                onPress={toggleMode}
+              >
+                <CustomText style={[styles.buttonText, mode === 'draw' && styles.activeButtonText]}>
+                  {mode === 'draw' ? 'Move' : 'Draw'}
+                </CustomText>
+              </TouchableOpacity>
 
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity 
-              style={[styles.iconButton, canUndo && styles.activeButton, !canUndo && styles.disabledButton]} 
-              onPress={handleUndo}
-              disabled={!canUndo}
-            >
-              <ArrowUDownLeft
-                size={24}
-                color={canUndo ? "#FFFFFF" : "#666666"}
-                weight="bold"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.iconButton, canRedo && styles.activeButton, !canRedo && styles.disabledButton]} 
-              onPress={handleRedo}
-              disabled={!canRedo}
-            >
-              <ArrowUDownRight
-                size={24}
-                color={canRedo ? "#FFFFFF" : "#666666"}
-                weight="bold"
-              />
-            </TouchableOpacity>
+              <View style={styles.buttonGroup}>
+                <TouchableOpacity 
+                  style={[styles.iconButton, canUndo && styles.activeButton, !canUndo && styles.disabledButton]} 
+                  onPress={handleUndo}
+                  disabled={!canUndo}
+                >
+                  <ArrowUDownLeft
+                    size={24}
+                    color={canUndo ? "#FFFFFF" : "#666666"}
+                    weight="bold"
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.iconButton, canRedo && styles.activeButton, !canRedo && styles.disabledButton]} 
+                  onPress={handleRedo}
+                  disabled={!canRedo}
+                >
+                  <ArrowUDownRight
+                    size={24}
+                    color={canRedo ? "#FFFFFF" : "#666666"}
+                    weight="bold"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Center Column */}
+            <View style={styles.column}>
+              <TouchableOpacity 
+                style={[styles.aiButton, isTestingAI && styles.disabledButton]} 
+                onPress={proceedWithAPICallHandler}
+                disabled={isTestingAI}
+              >
+                <Alien 
+                  size={32}
+                  color={selectedColor}
+                  // color={selectedColor === DEFAULT_STROKE_COL ? '#2eff4d' : selectedColor}
+                  weight="fill"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Right Column */}
+            <View style={styles.column}>
+              <TouchableOpacity 
+                style={[styles.button, !canvasEmpty && styles.activeButton, canvasEmpty && styles.disabledButton]} 
+                onPress={handleClear}
+                disabled={canvasEmpty}
+                accessibilityLabel="Clear canvas"
+              >
+                <TrashSimple
+                  size={28}
+                  color={!canvasEmpty ? "#FFFFFF" : "#666666"}
+                  weight="bold"
+                />
+              </TouchableOpacity>
+
+              <View style={styles.buttonGroup}>
+                <TouchableOpacity 
+                  style={[styles.iconButton, canZoomOut && styles.activeButton, !canZoomOut && styles.disabledButton]} 
+                  onPress={() => handleZoom(false)}
+                  disabled={!canZoomOut}
+                >
+                  <MagnifyingGlassMinus
+                    size={24}
+                    color={canZoomOut ? "#FFFFFF" : "#666666"}
+                    weight="bold"
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.iconButton, canZoomIn && styles.activeButton, !canZoomIn && styles.disabledButton]} 
+                  onPress={() => handleZoom(true)}
+                  disabled={!canZoomIn}
+                >
+                  <MagnifyingGlassPlus
+                    size={24}
+                    color={canZoomIn ? "#FFFFFF" : "#666666"}
+                    weight="bold"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
 
-        {/* Center Column */}
-        <View style={styles.column}>
-          <TouchableOpacity 
-            style={[styles.aiButton, isTestingAI && styles.disabledButton]} 
-            onPress={proceedWithAPICallHandler}
-            disabled={isTestingAI}
-          >
-            <Alien 
-              size={32}
-              color={selectedColor === DEFAULT_STROKE_COL ? '#2eff4d' : selectedColor}
-              weight="fill"
+          {/* Main Canvas */}
+          <View style={styles.canvasContainer}>
+            <DrawingCanvas
+              ref={canvasRef}
+              mode={mode}
+              onZoomChange={setZoom}
+              selectedColor={selectedColor}
+              onModeChange={setMode}
+              backgroundColor={DEFAULT_CANVAS_BG}
+              tool={activeTool}
+              strokeWidth={strokeWidth}
             />
-          </TouchableOpacity>
-        </View>
+          </View>
 
-        {/* Right Column */}
-        <View style={styles.column}>
-          <TouchableOpacity 
-            style={[styles.button, !canvasEmpty && styles.activeButton, canvasEmpty && styles.disabledButton]} 
-            onPress={handleClear}
-            disabled={canvasEmpty}
-            accessibilityLabel="Clear canvas"
-          >
-            <TrashSimple
-              size={28}
-              color={!canvasEmpty ? "#FFFFFF" : "#666666"}
-              weight="bold"
+          {/* Bottom Toolbar */}
+          <View style={styles.bottomToolbar}>
+            <BottomToolbar
+              color={selectedColor}
+              onColorChange={setSelectedColor}
+              backgroundColor={DEFAULT_CANVAS_BG}
+              onToolChange={setActiveTool}
+              onStrokeWidthChange={setStrokeWidth}
+              defaultStrokeWidth={strokeWidth}
+              canErase={!canvasEmpty}
             />
-          </TouchableOpacity>
-
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity 
-              style={[styles.iconButton, canZoomOut && styles.activeButton, !canZoomOut && styles.disabledButton]} 
-              onPress={() => handleZoom(false)}
-              disabled={!canZoomOut}
-            >
-              <MagnifyingGlassMinus
-                size={24}
-                color={canZoomOut ? "#FFFFFF" : "#666666"}
-                weight="bold"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.iconButton, canZoomIn && styles.activeButton, !canZoomIn && styles.disabledButton]} 
-              onPress={() => handleZoom(true)}
-              disabled={!canZoomIn}
-            >
-              <MagnifyingGlassPlus
-                size={24}
-                color={canZoomIn ? "#FFFFFF" : "#666666"}
-                weight="bold"
-              />
-            </TouchableOpacity>
           </View>
-        </View>
-      </View>
 
-      {/* Canvas */}
-      <View style={styles.canvasContainer}>
-        <DrawingCanvas
-          ref={canvasRef}
-          mode={mode}
-          onZoomChange={setZoom}
-          selectedColor={selectedColor}
-          onModeChange={setMode}
-          backgroundColor={DEFAULT_CANVAS_BG}
-          tool={activeTool}
-          strokeWidth={strokeWidth}
+          {/* Clear Confirmation Modal */}
+          <Modal
+            isVisible={showConfirm}
+            onBackdropPress={() => setShowConfirm(false)}
+            style={styles.modal}
+          >
+            <View style={styles.modalCard}>
+              <CustomText style={styles.modalTitle}>Clear canvas?</CustomText>
+              <CustomText style={styles.modalMsg}>This will erase all strokes.</CustomText>
+              <View style={styles.modalRow}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancel]}
+                  onPress={() => setShowConfirm(false)}
+                >
+                  <CustomText style={styles.modalCancelTxt}>Cancel</CustomText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalDanger]}
+                  onPress={() => {
+                    canvasRef.current?.clear();
+                    setShowConfirm(false);
+                  }}
+                >
+                  <CustomText style={styles.modalDangerTxt}>Clear</CustomText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </>
+      )}
+      
+      {showIntro && (
+        <IntroOverlay 
+          onComplete={() => {
+            setShowIntro(false);
+            // Small delay to ensure smooth transition
+            setTimeout(() => setShowMainContent(true), 100);
+          }} 
         />
-      </View>
-
-      {/* Bottom Toolbar */}
-      <View style={styles.bottomToolbar}>
-        <BottomToolbar
-          color={selectedColor}
-          onColorChange={setSelectedColor}
-          backgroundColor={DEFAULT_CANVAS_BG}
-          onToolChange={setActiveTool}
-          onStrokeWidthChange={setStrokeWidth}
-          defaultStrokeWidth={strokeWidth}
-          canErase={!canvasEmpty}
-        />
-      </View>
-
-      <Modal
-        isVisible={showConfirm}
-        onBackdropPress={() => setShowConfirm(false)}
-        animationIn="zoomIn"
-        animationOut="zoomOut"
-        backdropColor="transparent"
-        backdropOpacity={0.5}
-        style={styles.modalContainer}
-      >
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Clear canvas?</Text>
-          <Text style={styles.modalMsg}>This will erase all strokes.</Text>
-          <View style={styles.modalRow}>
-            <TouchableOpacity
-              style={[styles.modalBtn, styles.modalCancel]}
-              onPress={() => setShowConfirm(false)}
-            >
-              <Text style={styles.modalCancelTxt}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalBtn, styles.modalDanger]}
-              onPress={() => {
-                canvasRef.current?.clear();
-                setShowConfirm(false);
-              }}
-            >
-              <Text style={styles.modalDangerTxt}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      )}
     </GestureHandlerRootView>
   );
 }
@@ -359,10 +399,11 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#000000',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   activeButtonText: {
     color: '#ffffff',
+    fontWeight: '400',
   },
   buttonGroup: {
     flexDirection: 'row',
@@ -401,7 +442,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingHorizontal: 16,
   },
-  modalContainer: {
+  modal: {
     justifyContent: 'center',
     alignItems: 'center',
   },
