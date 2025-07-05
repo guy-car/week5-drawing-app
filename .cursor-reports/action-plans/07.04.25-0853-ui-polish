@@ -1,0 +1,48 @@
+# UI Polish Action Plan
+
+## 1. Eraser Button State Management
+**Files**: `components/BottomToolbar.tsx`
+**Goal**: Match Clear/Undo/Redo button behavior
+### Implementation Notes
+- Use ref.isEmpty() approach for simplicity and consistency
+- Apply inactive style:
+  - Grey background (#e0e0e0)
+  - Icon tint: #666666
+  - Trigger when hasStrokes === false
+
+## 2. Eraser Cursor Visibility
+**Files**: `components/DrawingCanvas.tsx`
+### Changes
+- Update Circle element style
+- Change: `color="rgba(0,0,0,0.25)"` → `color="#666666"`
+- Add strokeWidth: 1 for light outline
+**Risk Level**: Very Low (style-only change)
+
+## 3. Remove White Separator Lines
+**Files**: `App.tsx`
+### Changes
+- Header: Remove `borderBottomWidth` and `borderBottomColor` completely
+- Bottom Toolbar: Remove `borderTopWidth` and `borderTopColor` completely
+**Risk Level**: Minimal (visual-only)
+
+## 4. Clear Button Icon Update
+**Files**: `App.tsx`
+### Changes
+- Replace text with Phosphor icon:
+  ```diff
+  - <Text>Clear</Text>
+  + <TrashSimple size={28} />  // Match bottom toolbar icon size
+  ```
+- Add import: `import { TrashSimple } from 'phosphor-react-native'`
+- Preserve accessibility label: "Clear canvas"
+- Keep same button dimensions
+
+## Implementation Order
+1. Start with separator lines removal (lowest risk)
+2. Update Clear button to icon (visual only)
+3. Add eraser cursor outline (contained change)
+4. Implement eraser button state management (most complex)
+
+## Future Enhancement (Postponed)
+- Multi-finger gesture support will be addressed in a separate task
+- Current mode-switching UI will remain for now
