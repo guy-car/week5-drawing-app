@@ -396,7 +396,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
     paddingHorizontal: 16,
   },
   modalContainer: {
