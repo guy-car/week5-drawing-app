@@ -18,6 +18,7 @@ import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL, DEFAULT_APP_BG } from './src/con
 import IntroOverlay from './components/IntroOverlay';
 import CustomText from './components/CustomText';
 import GlowButton from './components/GlowButton';
+import StarField from './components/StarField';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -196,6 +197,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="auto" />
+      <StarField />
       
       {showMainContent && (
         <>
@@ -242,7 +244,7 @@ export default function App() {
             </View>
 
             {/* Center Column */}
-            <View style={styles.column}>
+            <View style={styles.centerColumn}>
               <GlowButton 
                 style={[styles.aiButton, isTestingAI && styles.disabledButton]} 
                 glowLevel={!isTestingAI ? 'high' : 'none'}
@@ -378,11 +380,11 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: DEFAULT_APP_BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
-    backgroundColor: DEFAULT_APP_BG,
+    backgroundColor: 'transparent',
     paddingTop: 50,
     paddingBottom: 10,
   },
@@ -394,12 +396,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 8,
   },
+  centerColumn: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
   button: {
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#e0e0e0',
-    minWidth: 80,
+    width: 90,
     alignItems: 'center',
   },
   activeButton: {
@@ -443,7 +452,7 @@ const styles = StyleSheet.create({
   },
   canvasContainer: {
     flex: 1,
-    backgroundColor: DEFAULT_APP_BG,
+    backgroundColor: 'transparent',
   },
   bottomToolbar: {
     backgroundColor: 'transparent',
