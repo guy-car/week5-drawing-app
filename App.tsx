@@ -380,25 +380,25 @@ export default function App() {
                 style={[styles.loadingText, styles.textGlow3]}
                 fontFamily="Exo2-Medium"
               >
-                [Incoming transmission...]
+                [Awaiting response...]
               </CustomText>
               <CustomText 
                 style={[styles.loadingText, styles.textGlow2]}
                 fontFamily="Exo2-Medium"
               >
-                [Incoming transmission...]
+                [Awaiting response...]
               </CustomText>
               <CustomText 
                 style={[styles.loadingText, styles.textGlow1]}
                 fontFamily="Exo2-Medium"
               >
-                [Incoming transmission...]
+                [Awaiting response...]
               </CustomText>
               <CustomText 
                 style={[styles.loadingText]}
                 fontFamily="Exo2-Medium"
               >
-                [Incoming transmission...]
+                [Awaiting response...]
               </CustomText>
             </Animated.View>
           </View>
@@ -408,11 +408,11 @@ export default function App() {
             <BottomToolbar
               color={selectedColor}
               onColorChange={setSelectedColor}
-              backgroundColor={DEFAULT_CANVAS_BG}
               onToolChange={setActiveTool}
               onStrokeWidthChange={setStrokeWidth}
-              defaultStrokeWidth={strokeWidth}
               canErase={!canvasEmpty}
+              canvasRef={canvasRef}
+              canvasEmpty={canvasEmpty}
             />
           </View>
 
