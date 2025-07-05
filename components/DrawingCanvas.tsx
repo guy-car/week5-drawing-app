@@ -27,6 +27,7 @@ interface DrawingCanvasProps {
   backgroundColor?: string;
   tool?: 'draw' | 'erase';
   strokeWidth?: number;
+  onFirstAICommand?: () => void;
 }
 
 interface DrawingCanvasRef {
@@ -64,7 +65,7 @@ interface Stroke {
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  ({ mode, onZoomChange, selectedColor, onModeChange, backgroundColor, tool = 'draw', strokeWidth = 2 }, ref) => {
+  ({ mode, onZoomChange, selectedColor, onModeChange, backgroundColor, tool = 'draw', strokeWidth = 2, onFirstAICommand }, ref) => {
     const [paths, setPaths] = useState<any[]>([]);
     const [currentPath, setCurrentPath] = useState<PathWithData | null>(null);
     const [userCommands, setUserCommands] = useState<DrawingCommand[]>([]);
@@ -211,8 +212,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       setPaths(prevPaths => [...prevPaths, gridPath]);
     };
 
+    const isFirstCommandRef = useRef(true);
+
     const addAICommandIncremental = (command: DrawingCommand) => {
       try {
+        if (isFirstCommandRef.current) {
+          isFirstCommandRef.current = false;
+          onFirstAICommand?.();
+        }
         
         if (!aiPathRef.current) {
           aiPathRef.current = Skia.Path.Make();
@@ -243,6 +250,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         streamLog.warn('❌ Error processing AI command:', error);
       }
     };
+
+    // Reset first command flag when starting new AI interaction
+    useEffect(() => {
+      if (!aiPathRef.current) {
+        isFirstCommandRef.current = true;
+      }
+    }, [aiPathRef.current]);
 
     const canUndo = () => undoStack.current.length > 0;
     const canRedo = () => redoStack.current.length > 0;
