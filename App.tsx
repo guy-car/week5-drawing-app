@@ -14,6 +14,7 @@ import { stamp, printPerf } from './src/utils/performance';
 import BottomToolbar from './components/BottomToolbar';
 import LinearGradient from 'react-native-linear-gradient';
 import { DEFAULT_CANVAS_BG, DEFAULT_STROKE_COL, DEFAULT_APP_BG } from './src/constants/canvas';
+import IntroOverlay from './components/IntroOverlay';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -46,6 +47,7 @@ export default function App() {
   const [activeTool, setActiveTool] = useState<'draw' | 'erase'>('draw');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const canvasRef = useRef<DrawingCanvasRef>(null);
+  const [showIntro, setShowIntro] = useState(true);
   
   // Zoom button state
   const MIN_ZOOM = 0.5;
@@ -216,7 +218,8 @@ export default function App() {
           >
             <Alien 
               size={32}
-              color={selectedColor === DEFAULT_STROKE_COL ? '#2eff4d' : selectedColor}
+              color={selectedColor}
+              // color={selectedColor === DEFAULT_STROKE_COL ? '#2eff4d' : selectedColor}
               weight="fill"
             />
           </TouchableOpacity>
@@ -322,6 +325,8 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {showIntro && <IntroOverlay onComplete={() => setShowIntro(false)} />}
     </GestureHandlerRootView>
   );
 }

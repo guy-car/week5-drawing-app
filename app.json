@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Drawing Canvas App",
-    "slug": "drawing-canvas-app",
+    "name": "week5-drawing-app",
+    "slug": "week5-drawing-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -12,10 +12,18 @@
       "supportsTablet": true
     },
     "android": {
-      "backgroundColor": "#FFFFFF"
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
     },
-    "plugins": []
+    "plugins": [],
+    "fonts": {
+      "Exo2-Light": "./assets/fonts/Exo2-Light.ttf",
+      "Exo2-Regular": "./assets/fonts/Exo2-Regular.ttf",
+      "Exo2-Medium": "./assets/fonts/Exo2-MediumItalic.ttf"
+    }
   }
 } 
